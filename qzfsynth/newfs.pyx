@@ -246,11 +246,15 @@ cdef extern from 'fluidsynth.h':
     cdef float fluid_synth_get_gen(fluid_synth_t *synth, int chan, int param);
     cdef double fluid_synth_get_cpu_load(fluid_synth_t *synth)
 
+cdef extern from "cnufs.h":
+    cdef char *fs_get_sf_info(fluid_synth_t *synth, int sfid)
+
 cdef class Synthesizer:
     cdef fluid_synth_t *ptr
     cdef Settings settings
     cdef int sfid
     cdef fluid_sfont_t *sfont
+    cdef str sf_info_str
 
     def __cinit__(self, settings):
         self.settings = settings
@@ -263,7 +267,7 @@ cdef class Synthesizer:
         if self.ptr:
             delete_fluid_synth(self.ptr)
 
-    def sfload(self, filename: str):
+    def sfload(self, filename: str) -> None:
         if self.sfid != FLUID_FAILED:
             self.sfunload()
         cdef bytes path = filename.encode('utf-8')
@@ -273,15 +277,26 @@ cdef class Synthesizer:
         self.sfont = fluid_synth_get_sfont_by_id(self.ptr, self.sfid)
         if not self.sfont:
             raise RuntimeError
+        cdef char *csf_info = fs_get_sf_info(self.ptr, self.sfid)
+        if not csf_info:
+            raise RuntimeError
+        cdef bytes bsf_info = csf_info
+        self.sf_info_str = bsf_info.decode('utf-8')
+
+    @property
+    def sf_info(self) -> list[str] | None:
+        if self.sfid:
+            return self.sf_info_str.split('\n')
 
     def sfunload(self):
-        cdef int err
+        cdef int err = FLUID_OK
         if self.sfid != FLUID_FAILED:
             err = fluid_synth_sfunload(self.ptr, self.sfid, 1)
-            if err == FLUID_FAILED:
-                raise RuntimeError
-            self.sfid = FLUID_FAILED
-            self.sfont = NULL
+        self.sfid = FLUID_FAILED
+        self.sfont = NULL
+        self.sf_info_str = None
+        if err == FLUID_FAILED:
+            raise RuntimeError
 
     def noteon(self, int chan, int key, int vel):
         cdef int err = fluid_synth_noteon(self.ptr, chan, key, vel)

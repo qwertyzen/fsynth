@@ -52,3 +52,48 @@ int fs_settings_get_names(fluid_settings_t *settings, char **pnames)
 fn_fail:
     return FLUID_FAILED;
 }
+
+char *fs_get_sf_info(fluid_synth_t *synth, int sfid)
+{
+    fluid_sfont_t *sfont = fluid_synth_get_sfont_by_id(synth, sfid);
+    if (sfont == NULL) {
+        fprintf(stderr, "Failed to load soundfont.\n");
+        return NULL;
+    }
+
+    fluid_preset_t* preset = NULL;
+
+    size_t buffer_size = 256, used_size = 0;
+    char* sf_info_str = calloc(buffer_size, sizeof(char));
+    if (!sf_info_str) {
+        return NULL;
+    }
+
+    const char *preset_name;
+    int bank_num, preset_num;
+    fluid_sfont_iteration_start(sfont);
+
+    while ((preset = fluid_sfont_iteration_next(sfont)) != NULL) {
+        if (preset == NULL) break;
+
+        preset_name = fluid_preset_get_name(preset);
+        bank_num = fluid_preset_get_banknum(preset);
+        preset_num = fluid_preset_get_num(preset);
+
+        size_t entry_length = snprintf(NULL, 0, "%d-%d: %s\n", bank_num, preset_num, preset_name) + 1;
+
+        if (used_size + entry_length >= buffer_size) {
+            buffer_size *= 2;
+            char* temp = realloc(sf_info_str, buffer_size);
+            if (!temp) {
+                free(sf_info_str);
+                return NULL;
+            }
+            sf_info_str = temp;
+        }
+
+        snprintf(sf_info_str + used_size, entry_length, "%d-%d: %s\n", bank_num, preset_num, preset_name);
+        used_size += entry_length - 1;
+    }
+    return sf_info_str;
+}
