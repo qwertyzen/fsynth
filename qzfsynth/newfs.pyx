@@ -3,6 +3,7 @@ from libc.stdlib cimport free
 cdef extern from "fluidsynth.h":
     cdef void fluid_version(int *major, int *minor, int *micro)
     cdef int FLUID_OK
+    cdef int FLUID_FAILED
     cdef int FLUID_NO_TYPE
     cdef int FLUID_NUM_TYPE
     cdef int FLUID_INT_TYPE
@@ -180,11 +181,195 @@ cdef class Settings:
         free(copts)
         return opts.split('\n')
 
-def enumerate_audio_devices(audio_driver: str) -> str:
-    cdef int err
-    cdef fluid_settings_t *settings
-    settings = new_fluid_settings()
-    if settings == NULL:
-        raise RuntimeError
-    cdef bytes adriver = f'audio.{audio_driver}.device'.encode('utf-8')
-    cdef char *c_opts = NULL
+    def is_realtime(self, name: str) -> int:
+        cdef int isrt
+        cdef bytes bname = name.encode('utf-8')
+        print(self.get(name))
+        isrt = fluid_settings_is_realtime(self.ptr, bname)
+        return isrt
+
+def enumerate_audio_devices(audio_driver: str = None) -> list[str]:
+    settings = Settings()
+    if not audio_driver:
+        audio_driver = settings.get('audio.driver')
+    adriver = f'audio.{audio_driver}.device'
+    devices = settings.get_options(adriver)
+    return devices
+
+cdef extern from 'fluidsynth.h':
+    struct fluid_synth_s
+    ctypedef fluid_synth_s fluid_synth_t
+    cdef fluid_synth_t *new_fluid_synth (fluid_settings_t *settings)
+    cdef void delete_fluid_synth (fluid_synth_t *synth)
+    struct fluid_sfont_s
+    ctypedef fluid_sfont_s fluid_sfont_t
+    cdef int fluid_synth_sfload(fluid_synth_t *synth, const char *filename, int reset_presets)
+    cdef int fluid_synth_sfunload(fluid_synth_t *synth, int id, int reset_presets)
+    cdef fluid_sfont_t *fluid_synth_get_sfont_by_id (fluid_synth_t *synth, int id)
+    cdef int fluid_synth_add_sfont (fluid_synth_t *synth, fluid_sfont_t *sfont)
+    cdef int fluid_synth_get_bank_offset (fluid_synth_t *synth, int sfont_id)
+    cdef int fluid_synth_sfcount(fluid_synth_t *synth)
+
+    cdef int fluid_synth_noteon(fluid_synth_t *synth, int chan, int key, int vel)
+    cdef int fluid_synth_noteoff(fluid_synth_t *synth, int chan, int key)
+    cdef int fluid_synth_cc(fluid_synth_t *synth, int chan, int ctrl, int val)
+    cdef int fluid_synth_get_cc(fluid_synth_t *synth, int chan, int ctrl, int *pval)
+    cdef int fluid_synth_sysex(fluid_synth_t *synth, const char *data, int len,
+                                     char *response, int *response_len, int *handled, int dryrun)
+    cdef int fluid_synth_pitch_bend(fluid_synth_t *synth, int chan, int val)
+    cdef int fluid_synth_get_pitch_bend(fluid_synth_t *synth, int chan, int *ppitch_bend)
+    cdef int fluid_synth_pitch_wheel_sens(fluid_synth_t *synth, int chan, int val)
+    cdef int fluid_synth_get_pitch_wheel_sens(fluid_synth_t *synth, int chan, int *pval)
+    cdef int fluid_synth_program_change(fluid_synth_t *synth, int chan, int program)
+    cdef int fluid_synth_channel_pressure(fluid_synth_t *synth, int chan, int val)
+    cdef int fluid_synth_key_pressure(fluid_synth_t *synth, int chan, int key, int val)
+    cdef int fluid_synth_bank_select(fluid_synth_t *synth, int chan, int bank)
+    cdef int fluid_synth_sfont_select(fluid_synth_t *synth, int chan, int sfont_id)
+
+    cdef int fluid_synth_program_select(fluid_synth_t *synth, int chan, int sfont_id,
+                               int bank_num, int preset_num)
+    cdef int fluid_synth_program_select_by_sfont_name(fluid_synth_t *synth, int chan,
+        const char *sfont_name, int bank_num,
+        int preset_num)
+
+    cdef int fluid_synth_get_program(fluid_synth_t *synth, int chan, int *sfont_id,
+                            int *bank_num, int *preset_num);
+    cdef int fluid_synth_unset_program(fluid_synth_t *synth, int chan);
+    cdef int fluid_synth_program_reset(fluid_synth_t *synth);
+    cdef int fluid_synth_system_reset(fluid_synth_t *synth);
+
+    cdef int fluid_synth_all_notes_off(fluid_synth_t *synth, int chan);
+    cdef int fluid_synth_all_sounds_off(fluid_synth_t *synth, int chan);
+
+    cdef int fluid_synth_set_gen(fluid_synth_t *synth, int chan,
+                                       int param, float value);
+    cdef float fluid_synth_get_gen(fluid_synth_t *synth, int chan, int param);
+    cdef double fluid_synth_get_cpu_load(fluid_synth_t *synth)
+
+cdef class Synthesizer:
+    cdef fluid_synth_t *ptr
+    cdef Settings settings
+    cdef int sfid
+    cdef fluid_sfont_t *sfont
+
+    def __cinit__(self, settings):
+        self.settings = settings
+        self.ptr = new_fluid_synth(self.settings.ptr)
+        self.sfid = FLUID_FAILED
+        if not self.ptr:
+            raise RuntimeError
+
+    def __dealloc__(self):
+        if self.ptr:
+            delete_fluid_synth(self.ptr)
+
+    def sfload(self, filename: str):
+        if self.sfid != FLUID_FAILED:
+            self.sfunload()
+        cdef bytes path = filename.encode('utf-8')
+        self.sfid = fluid_synth_sfload(self.ptr, path, 1)
+        if self.sfid == FLUID_FAILED:
+            raise RuntimeError
+        self.sfont = fluid_synth_get_sfont_by_id(self.ptr, self.sfid)
+        if not self.sfont:
+            raise RuntimeError
+
+    def sfunload(self):
+        cdef int err
+        if self.sfid != FLUID_FAILED:
+            err = fluid_synth_sfunload(self.ptr, self.sfid, 1)
+            if err == FLUID_FAILED:
+                raise RuntimeError
+            self.sfid = FLUID_FAILED
+            self.sfont = NULL
+
+    def noteon(self, int chan, int key, int vel):
+        cdef int err = fluid_synth_noteon(self.ptr, chan, key, vel)
+        if err == FLUID_FAILED:
+            raise RuntimeError
+
+    def noteoff(self, int chan, int key):
+        cdef int err = fluid_synth_noteoff(self.ptr, chan, key)
+        if err == FLUID_FAILED:
+            raise RuntimeError
+
+    def get_cc(self, int chan, int ctrl) -> int:
+        cdef int val
+        cdef int err = fluid_synth_get_cc(self.ptr, chan, ctrl, &val)
+        if err == FLUID_FAILED:
+            raise RuntimeError
+        return val
+
+    def cpu_load(self) -> float:
+        return fluid_synth_get_cpu_load(self.ptr)
+
+    # def add_sfont_other(self, synth: Synthesizer):
+    #     self.sfunload()
+    #     cdef int err = fluid_synth_add_sfont(self.ptr, synth.sfont)
+    #     if err == FLUID_FAILED:
+    #         raise RuntimeError
+
+cdef extern from "fluidsynth.h":
+    struct fluid_audio_driver_s
+    ctypedef fluid_audio_driver_s fluid_audio_driver_t
+    cdef fluid_audio_driver_t *new_fluid_audio_driver(fluid_settings_t *settings,
+        fluid_synth_t *synth)
+    cdef void delete_fluid_audio_driver	(	fluid_audio_driver_t * 	driver	)
+
+cdef class AudioDriver:
+    cdef fluid_audio_driver_t *ptr
+    cdef Settings settings
+    cdef Synthesizer synth
+
+    def __cinit__(self, settings: Settings, synth: Synthesizer):
+        self.settings = settings
+        self.synth = synth
+        self.ptr = new_fluid_audio_driver(self.settings.ptr, self.synth.ptr)
+        if not self.ptr:
+            raise RuntimeError
+
+    def __dealloc__(self):
+        if self.ptr:
+            delete_fluid_audio_driver(self.ptr)
+            self.ptr = NULL
+
+cdef extern from "fluidsynth.h":
+    struct fluid_player_s
+    ctypedef fluid_player_s fluid_player_t
+    cdef fluid_player_t *new_fluid_player(fluid_synth_t *synth)
+    cdef void delete_fluid_player(fluid_player_t *player)
+    cdef int fluid_player_add(fluid_player_t *player, const char *midifile)
+    cdef int fluid_player_add_mem(fluid_player_t *player, const void *buffer, size_t len)
+    cdef int fluid_player_play(fluid_player_t *player)
+    cdef int fluid_player_stop(fluid_player_t *player)
+    cdef int fluid_player_join(fluid_player_t *player)
+    cdef int fluid_player_set_loop(fluid_player_t *player, int loop)
+    cdef int fluid_player_set_tempo(fluid_player_t *player, int tempo_type, double tempo)
+    struct fluid_midi_event_s
+    ctypedef fluid_midi_event_s fluid_midi_event_t
+    ctypedef int (*handle_midi_event_func_t)(void *data, fluid_midi_event_t *event);
+    ctypedef int (*handle_midi_tick_func_t)(void *data, int tick)
+    cdef int fluid_player_set_playback_callback(fluid_player_t *player, handle_midi_event_func_t handler, void *handler_data)
+    cdef int fluid_player_set_tick_callback(fluid_player_t *player, handle_midi_tick_func_t handler, void *handler_data)
+    cdef int fluid_player_get_status(fluid_player_t *player)
+    cdef int fluid_player_get_current_tick(fluid_player_t *player)
+    cdef int fluid_player_get_total_ticks(fluid_player_t *player)
+    cdef int fluid_player_get_bpm(fluid_player_t *player)
+    cdef int fluid_player_get_division(fluid_player_t *player)
+    cdef int fluid_player_get_midi_tempo(fluid_player_t *player)
+    cdef int fluid_player_seek(fluid_player_t *player, int ticks)
+
+cdef class Player:
+    cdef fluid_player_t *ptr
+    cdef Synthesizer synth
+
+    def __cinit__(self, synth: Synthesizer):
+        self.synth = synth
+        self.ptr = new_fluid_player(synth.ptr)
+        if not self.ptr:
+            raise RuntimeError
+
+    def __dealloc__(self):
+        if self.ptr:
+            delete_fluid_player(self.ptr)
+            self.ptr = NULL
