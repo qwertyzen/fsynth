@@ -1,4 +1,4 @@
-from libc.stdlib cimport free
+from libc.stdlib cimport free, malloc
 
 cdef extern from "fluidsynth.h":
     cdef void fluid_version(int *major, int *minor, int *micro)
@@ -324,7 +324,7 @@ cdef class Synthesizer:
         cdef int err = fluid_synth_key_pressure(self.ptr, chan, key, val)
 
     def pitch_wheel_sens(self, int chan, int val):
-        cdef int err = fluid_synth_key_pressure(self.ptr, chan, val)
+        cdef int err = fluid_synth_pitch_wheel_sens(self.ptr, chan, val)
 
     def get_cc(self, int chan, int ctrl) -> int:
         cdef int val
@@ -332,12 +332,6 @@ cdef class Synthesizer:
         if err == FLUID_FAILED:
             raise RuntimeError
         return val
-
-    def get_program(self, int chan) -> int:
-        cdef int prog
-        cdef int err = fluid_synth_get_program(self.ptr, chan, &prog)
-
-        return prog
 
     def get_pitch_bend(self, int chan) -> int:
         cdef int pbend
@@ -427,3 +421,91 @@ cdef class Player:
         if self.ptr:
             delete_fluid_player(self.ptr)
             self.ptr = NULL
+
+cdef extern from "fluidsynth.h":
+
+    cdef int fluid_synth_activate_key_tuning(fluid_synth_t *synth, int bank, int prog, const char *name, const double *pitch, int apply)
+    cdef int fluid_synth_activate_octave_tuning(fluid_synth_t *synth, int bank, int prog, const char *name, const double *pitch, int apply)
+    cdef int fluid_synth_tune_notes(fluid_synth_t *synth, int bank, int prog, int len, const int *keys, const double *pitch, int apply)
+    cdef int fluid_synth_activate_tuning(fluid_synth_t *synth, int chan, int bank, int prog, int apply)
+    cdef int fluid_synth_deactivate_tuning(fluid_synth_t *synth, int chan, int apply)
+    cdef void fluid_synth_tuning_iteration_start(fluid_synth_t *synth)
+    cdef int fluid_synth_tuning_iteration_next(fluid_synth_t *synth, int *bank, int *prog)
+    cdef int fluid_synth_tuning_dump(fluid_synth_t *synth, int bank, int prog, char *name, int len, double *pitch)
+
+cdef class SynthTuner:
+    cdef fluid_synth_t *ptr
+
+    def __cinit__(self, synth: Synthesizer):
+        self.ptr = synth.ptr
+
+    def __dealloc__(self):
+        self.ptr = NULL
+
+    def activate_key_tuning(self, int bank, int prog, str name, list[float] pitch):
+        assert len(pitch) == 128
+        cdef double[128] cpitch
+        cdef int i
+        for i in range(128):
+            cpitch[i] = pitch[i]
+        cdef bytes bname = name.encode('utf-8')
+        cdef int err = fluid_synth_activate_key_tuning(self.ptr, bank, prog, bname, cpitch, 1)
+        if err == FLUID_FAILED:
+            raise RuntimeError
+
+    def activate_octave_tuning(self, int bank, int prog, str name, list[float] pitch):
+        assert len(pitch) == 12
+        cdef double[12] cpitch
+        cdef int i
+        for i in range(12):
+            cpitch[i] = pitch[i]
+        cdef bytes bname = name.encode('utf-8')
+        cdef int err = fluid_synth_activate_octave_tuning(self.ptr, bank, prog, bname, cpitch, 1)
+        if err == FLUID_FAILED:
+            raise RuntimeError
+
+    def activate_tuning(self, int chan, int bank, int prog):
+        cdef int err = fluid_synth_activate_tuning(self.ptr, chan, bank, prog, 1)
+        if err == FLUID_FAILED:
+            raise RuntimeError
+
+    def deactivate_tuning(self, int chan):
+        cdef int err = fluid_synth_deactivate_tuning(self.ptr, chan, 1)
+        if err == FLUID_FAILED:
+            raise RuntimeError
+
+    def tune_notes(self, int bank, int prog, list[int] key, list[float] pitch):
+        l = len(key)
+        assert l == len(pitch)
+        cdef int i
+        cdef int *ckey = <int *> malloc(l * sizeof(int))
+        cdef double *cpitch = <double *> malloc(l * sizeof(double))
+        for i in range(l):
+            ckey[i] = key[i]
+            cpitch[i] = pitch[i]
+        cdef int err = fluid_synth_tune_notes(self.ptr, bank, prog, l, ckey, cpitch, 1)
+        if err == FLUID_FAILED:
+            raise RuntimeError
+        free(cpitch)
+        free(ckey)
+
+    def tuning_dump(self, int bank, int prog, str name) -> list[float]:
+        cdef bytes bname = name.encode('utf-8')
+        cdef double[128] cpitch
+        cdef int err = fluid_synth_tuning_dump(self.ptr, bank, prog, bname, len(bname), cpitch)
+        if err == FLUID_FAILED:
+            raise RuntimeError
+        return [p for p in cpitch]
+
+    def get_tuning_banks(self) -> list[tuple(int, int)]:
+        ls = list()
+        fluid_synth_tuning_iteration_start(self.ptr)
+        cdef int bank = -1
+        cdef int prog = -1
+        cdef int state
+        while True:
+            state = fluid_synth_tuning_iteration_next(self.ptr, &bank, &prog)
+            if state != 1:
+                break
+            ls.append((bank, prog))
+        return ls
