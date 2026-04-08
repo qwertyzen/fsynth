@@ -106,7 +106,7 @@ int fast_file_write(const char *midi_file, const char *sf_file, const char *out_
     fluid_file_renderer_t* renderer;
     int id;
 
-    if !(fluid_is_midifile(midi_file) || fluid_is_soundfont(sf_file))
+    if ( !( fluid_is_midifile(midi_file) && fluid_is_soundfont(sf_file) ) )
         return FLUID_FAILED;
 
     settings = new_fluid_settings();

@@ -407,6 +407,7 @@ cdef extern from "fluidsynth.h":
     cdef int fluid_player_get_midi_tempo(fluid_player_t *player)
     cdef int fluid_player_seek(fluid_player_t *player, int ticks)
     cdef int FLUID_PLAYER_TEMPO_EXTERNAL_BPM
+    cdef int FLUID_PLAYER_PLAYING
 
 cdef class Player:
     cdef fluid_player_t *ptr
@@ -466,10 +467,17 @@ cdef class Player:
             raise RuntimeError
         return err
 
-    def get_total_ticks(self):
+    def get_total_ticks(self) -> int:
         cdef int err = fluid_player_get_total_ticks(self.ptr)
         if err == FLUID_FAILED:
             raise RuntimeError
+        return err
+
+    def is_playing(self) -> bool:
+        cdef int sta = fluid_player_get_status(self.ptr)
+        if sta == FLUID_PLAYER_PLAYING:
+            return True
+        return False
 
     def get_bpm(self):
         cdef int err = fluid_player_get_bpm(self.ptr)
