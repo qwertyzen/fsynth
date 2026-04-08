@@ -97,3 +97,47 @@ char *fs_get_sf_info(fluid_synth_t *synth, int sfid)
     }
     return sf_info_str;
 }
+
+int fast_file_write(const char *midi_file, const char *sf_file, const char *out_wav)
+{
+    fluid_settings_t* settings;
+    fluid_synth_t* synth;
+    fluid_player_t* player;
+    fluid_file_renderer_t* renderer;
+    int id;
+
+    if !(fluid_is_midifile(midi_file) || fluid_is_soundfont(sf_file))
+        return FLUID_FAILED;
+
+    settings = new_fluid_settings();
+    fluid_settings_setstr(settings, "audio.file.name", out_wav);
+    fluid_settings_setstr(settings, "player.timing-source", "sample");
+    fluid_settings_setint(settings, "synth.lock-memory", 0);
+
+    synth = new_fluid_synth(settings);
+    id = fluid_synth_sfload(synth, sf_file, 1);
+
+    player = new_fluid_player(synth);
+    fluid_player_add(player, midi_file);
+    fluid_player_play(player);
+
+    renderer = new_fluid_file_renderer (synth);
+
+    while (fluid_player_get_status(player) == FLUID_PLAYER_PLAYING)
+    {
+        if (fluid_file_renderer_process_block(renderer) != FLUID_OK)
+        {
+            break;
+        }
+    }
+
+    fluid_player_stop(player);
+    fluid_player_join(player);
+
+    fluid_synth_sfunload(synth, id, 0);
+    delete_fluid_file_renderer(renderer);
+    delete_fluid_player(player);
+    delete_fluid_synth(synth);
+    delete_fluid_settings(settings);
+    return FLUID_OK;
+}

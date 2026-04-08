@@ -509,3 +509,14 @@ cdef class SynthTuner:
                 break
             ls.append((bank, prog))
         return ls
+
+cdef extern from "cnufs.h":
+    cdef int fast_file_write(const char *midi_file, const char *sf_file, const char *out_wav)
+
+def synthesize_midifile(midi_file: str, sf_file: str, out_wav: str):
+    cdef bytes bmidi = midi_file.encode('utf-8')
+    cdef bytes bsff = sf_file.encode('utf-8')
+    cdef bytes bow = out_wav.encode('utf-8')
+    cdef int err = fast_file_write(bmidi, bsff, bow)
+    if err == FLUID_FAILED:
+        raise OSError('Error in Midi or SF file')
