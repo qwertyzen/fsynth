@@ -104,6 +104,8 @@ cdef class Settings:
             err = fluid_settings_copystr(self.ptr, bname, cvalue, 256)
             strval = cvalue.decode('utf-8')
             return strval
+        else:
+            print('Error', name, 'type', setting_type)
         raise TypeError
 
     def set(self, name: str, value: str | int | float):
@@ -122,6 +124,17 @@ cdef class Settings:
             raise TypeError
         if err != FLUID_OK:
             raise ValueError
+
+    def set_dict(self, dict data):
+        for key, val in data.items():
+            self.set(key, val)
+
+    def get_all(self) -> dict:
+        se = {}
+        for item in self.names.strip().split('\n'):
+            val = self.get(item)
+            se[item] = val
+        return se
 
     def get_default(self, name: str) -> str | int | float:
         cdef bytes bname = name.encode('utf-8')
@@ -147,6 +160,12 @@ cdef class Settings:
             strval = cvalue.decode('utf-8')
             return strval
         raise TypeError
+
+    def get_all_defaults(self) -> dict:
+        d = {}
+        for item in self.names.strip().split('\n'):
+            d[item] = self.get_default(item)
+        return d
 
     def get_range(self, name: str) -> tuple[int, int] | tuple[float, float]:
         cdef bytes bname = name.encode('utf-8')
@@ -564,7 +583,7 @@ cdef class SynthTuner:
             raise RuntimeError
         return [p for p in cpitch]
 
-    def get_tuning_banks(self) -> list[tuple(int, int)]:
+    def get_tuning_banks(self) -> list[tuple[int, int]]:
         ls = list()
         fluid_synth_tuning_iteration_start(self.ptr)
         cdef int bank = -1
