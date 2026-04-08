@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
-#include "cnufs.h"
+#include "cfsynth.h"
 
 typedef struct {
     int count;

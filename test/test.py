@@ -1,4 +1,4 @@
-from qzfsynth.newfs import *
+from fsynth.lib import *
 import time
 
 s = Settings()

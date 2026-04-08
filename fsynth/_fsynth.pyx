@@ -49,7 +49,7 @@ cdef extern from "fluidsynth.h":
     cdef void fluid_settings_foreach(fluid_settings_t *settings, void *data,
                             fluid_settings_foreach_t func);
 
-cdef extern from "cnufs.h":
+cdef extern from "cfsynth.h":
     cdef int fs_settings_get_options(fluid_settings_t *settings, const char *cname, char **poptions)
     cdef int fs_settings_get_names(fluid_settings_t *settings, char **pames)
 
@@ -266,7 +266,7 @@ cdef extern from 'fluidsynth.h':
     cdef float fluid_synth_get_gen(fluid_synth_t *synth, int chan, int param);
     cdef double fluid_synth_get_cpu_load(fluid_synth_t *synth)
 
-cdef extern from "cnufs.h":
+cdef extern from "cfsynth.h":
     cdef char *fs_get_sf_info(fluid_synth_t *synth, int sfid)
 
 cdef class Synthesizer:
@@ -597,7 +597,7 @@ cdef class SynthTuner:
             ls.append((bank, prog))
         return ls
 
-cdef extern from "cnufs.h":
+cdef extern from "cfsynth.h":
     cdef int fast_file_write(const char *midi_file, const char *sf_file, const char *out_wav)
 
 def synthesize_midifile(midi_file: str, sf_file: str, out_wav: str):

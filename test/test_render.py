@@ -1,4 +1,4 @@
-from qzfsynth.newfs import synthesize_midifile
+from fsynth.lib import synthesize_midifile
 import os
 
 path = os.path.join(os.path.expanduser('~'), 'Downloads')
