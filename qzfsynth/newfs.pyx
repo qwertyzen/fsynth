@@ -308,6 +308,24 @@ cdef class Synthesizer:
         if err == FLUID_FAILED:
             raise RuntimeError
 
+    def cc(self, int chan, int ctrl, int val):
+        cdef int err = fluid_synth_cc(self.ptr, chan, ctrl, val)
+
+    def pc(self, int chan, int prog):
+        cdef int err = fluid_synth_program_change(self.ptr, chan, prog)
+
+    def pitch_bend(self, int chan, int val):
+        cdef int err = fluid_synth_pitch_bend(self.ptr, chan, val)
+
+    def channel_pressure(self, int chan, int val):
+        cdef int err = fluid_synth_channel_pressure(self.ptr, chan, val)
+
+    def key_pressure(self, int chan, int key, int val):
+        cdef int err = fluid_synth_key_pressure(self.ptr, chan, key, val)
+
+    def pitch_wheel_sens(self, int chan, int val):
+        cdef int err = fluid_synth_key_pressure(self.ptr, chan, val)
+
     def get_cc(self, int chan, int ctrl) -> int:
         cdef int val
         cdef int err = fluid_synth_get_cc(self.ptr, chan, ctrl, &val)
@@ -315,7 +333,28 @@ cdef class Synthesizer:
             raise RuntimeError
         return val
 
-    def cpu_load(self) -> float:
+    def get_program(self, int chan) -> int:
+        cdef int prog
+        cdef int err = fluid_synth_get_program(self.ptr, chan, &prog)
+
+        return prog
+
+    def get_pitch_bend(self, int chan) -> int:
+        cdef int pbend
+        cdef int err = fluid_synth_get_pitch_bend(self.ptr, chan, &pbend)
+
+        return pbend
+
+    def get_pitch_wheel_sens(self, int chan) -> int:
+        cdef int pws
+        cdef int err = fluid_synth_get_pitch_wheel_sens(self.ptr, chan, &pws)
+
+        return pws
+
+    def system_reset(self):
+        cdef int err = fluid_synth_system_reset(self.ptr)
+
+    def get_cpu_load(self) -> float:
         return fluid_synth_get_cpu_load(self.ptr)
 
     # def add_sfont_other(self, synth: Synthesizer):
