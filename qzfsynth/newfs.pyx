@@ -55,7 +55,7 @@ cdef extern from "cnufs.h":
 
 cdef class Settings:
     cdef fluid_settings_t *ptr
-    cdef bytes _setting_names
+    cdef str _setting_names
 
     def __cinit__(self):
         self.ptr = new_fluid_settings()
@@ -74,12 +74,13 @@ cdef class Settings:
         err = fs_settings_get_names(self.ptr, &c_names)
         if err != FLUID_OK:
             raise Exception
-        self._setting_names = c_names
+        cdef bytes b_names = c_names
+        self._setting_names = b_names.decode('utf-8').strip()
         free(c_names)
 
     @property
-    def names(self) -> str:
-        return self._setting_names.decode('utf-8')
+    def names(self) -> list[str]:
+        return self._setting_names.split('\n')
 
     def get(self, name: str) -> str | int | float:
         cdef bytes bname = name.encode('utf-8')
@@ -131,7 +132,7 @@ cdef class Settings:
 
     def get_all(self) -> dict:
         se = {}
-        for item in self.names.strip().split('\n'):
+        for item in self.names:
             val = self.get(item)
             se[item] = val
         return se
@@ -163,7 +164,7 @@ cdef class Settings:
 
     def get_all_defaults(self) -> dict:
         d = {}
-        for item in self.names.strip().split('\n'):
+        for item in self.names:
             d[item] = self.get_default(item)
         return d
 
