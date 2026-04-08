@@ -406,6 +406,7 @@ cdef extern from "fluidsynth.h":
     cdef int fluid_player_get_division(fluid_player_t *player)
     cdef int fluid_player_get_midi_tempo(fluid_player_t *player)
     cdef int fluid_player_seek(fluid_player_t *player, int ticks)
+    cdef int FLUID_PLAYER_TEMPO_EXTERNAL_BPM
 
 cdef class Player:
     cdef fluid_player_t *ptr
@@ -421,6 +422,64 @@ cdef class Player:
         if self.ptr:
             delete_fluid_player(self.ptr)
             self.ptr = NULL
+
+    def add(self, midi_file: str):
+        cdef bytes bfile = midi_file.encode('utf-8')
+        cdef int err = fluid_player_add(self.ptr, bfile)
+        if err == FLUID_FAILED:
+            raise RuntimeError
+
+    def add_mem(self, bytes bmidi):
+        cdef const void *cmidi = <void *> bmidi
+        cdef int err = fluid_player_add_mem(self.ptr, cmidi, len(bmidi))
+        if err == FLUID_FAILED:
+            raise RuntimeError
+
+    def play(self):
+        cdef int err = fluid_player_play(self.ptr)
+        if err == FLUID_FAILED:
+            raise RuntimeError
+
+    def stop(self):
+        cdef int err = fluid_player_stop(self.ptr)
+        if err == FLUID_FAILED:
+            raise RuntimeError
+
+    def join(self):
+        cdef int err = fluid_player_join(self.ptr)
+        if err == FLUID_FAILED:
+            raise RuntimeError
+
+    def set_loop(self, int count):
+        cdef int err = fluid_player_set_loop(self.ptr, count)
+        if err == FLUID_FAILED:
+            raise RuntimeError
+
+    def set_tempo(self, float bpm):
+        cdef int err = fluid_player_set_tempo(self.ptr, FLUID_PLAYER_TEMPO_EXTERNAL_BPM, bpm)
+        if err == FLUID_FAILED:
+            raise RuntimeError
+
+    def get_current_tick(self) -> int:
+        cdef int err = fluid_player_get_current_tick(self.ptr)
+        if err == FLUID_FAILED:
+            raise RuntimeError
+        return err
+
+    def get_total_ticks(self):
+        cdef int err = fluid_player_get_total_ticks(self.ptr)
+        if err == FLUID_FAILED:
+            raise RuntimeError
+
+    def get_bpm(self):
+        cdef int err = fluid_player_get_bpm(self.ptr)
+        if err == FLUID_FAILED:
+            raise RuntimeError
+
+    def seek(self, int ticks):
+        cdef int err = fluid_player_seek(self.ptr, ticks)
+        if err == FLUID_FAILED:
+            raise RuntimeError
 
 cdef extern from "fluidsynth.h":
 
