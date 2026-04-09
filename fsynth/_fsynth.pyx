@@ -126,7 +126,7 @@ cdef class Settings:
         if err != FLUID_OK:
             raise ValueError
 
-    def set_dict(self, dict data):
+    def set_dict(self, data: dict):
         for key, val in data.items():
             self.set(key, val)
 
@@ -319,32 +319,32 @@ cdef class Synthesizer:
         if err == FLUID_FAILED:
             raise RuntimeError
 
-    def noteon(self, int chan, int key, int vel):
+    def noteon(self, chan: int, key: int, vel: int):
         cdef int err = fluid_synth_noteon(self.ptr, chan, key, vel)
         if err == FLUID_FAILED:
             raise RuntimeError
 
-    def noteoff(self, int chan, int key):
+    def noteoff(self, chan: int, key: int):
         cdef int err = fluid_synth_noteoff(self.ptr, chan, key)
         if err == FLUID_FAILED:
             raise RuntimeError
 
-    def cc(self, int chan, int ctrl, int val):
+    def cc(self, chan: int, ctrl: int, val: int):
         cdef int err = fluid_synth_cc(self.ptr, chan, ctrl, val)
 
-    def pc(self, int chan, int prog):
+    def pc(self, chan: int, prog: int):
         cdef int err = fluid_synth_program_change(self.ptr, chan, prog)
 
-    def pitch_bend(self, int chan, int val):
+    def pitch_bend(self, chan: int, val: int):
         cdef int err = fluid_synth_pitch_bend(self.ptr, chan, val)
 
-    def channel_pressure(self, int chan, int val):
+    def channel_pressure(self, chan: int, val: int):
         cdef int err = fluid_synth_channel_pressure(self.ptr, chan, val)
 
-    def key_pressure(self, int chan, int key, int val):
+    def key_pressure(self, chan: int, key: int, val: int):
         cdef int err = fluid_synth_key_pressure(self.ptr, chan, key, val)
 
-    def pitch_wheel_sens(self, int chan, int val):
+    def pitch_wheel_sens(self, chan: int, val: int):
         cdef int err = fluid_synth_pitch_wheel_sens(self.ptr, chan, val)
 
     def send_message(self, data: bytes):
@@ -353,20 +353,20 @@ cdef class Synthesizer:
         if err == FLUID_FAILED:
             raise RuntimeError
 
-    def get_cc(self, int chan, int ctrl) -> int:
+    def get_cc(self, chan: int, ctrl: int) -> int:
         cdef int val
         cdef int err = fluid_synth_get_cc(self.ptr, chan, ctrl, &val)
         if err == FLUID_FAILED:
             raise RuntimeError
         return val
 
-    def get_pitch_bend(self, int chan) -> int:
+    def get_pitch_bend(self, chan: int) -> int:
         cdef int pbend
         cdef int err = fluid_synth_get_pitch_bend(self.ptr, chan, &pbend)
 
         return pbend
 
-    def get_pitch_wheel_sens(self, int chan) -> int:
+    def get_pitch_wheel_sens(self, chan: int) -> int:
         cdef int pws
         cdef int err = fluid_synth_get_pitch_wheel_sens(self.ptr, chan, &pws)
 
@@ -457,7 +457,7 @@ cdef class Player:
         if err == FLUID_FAILED:
             raise RuntimeError
 
-    def add_mem(self, bytes bmidi):
+    def add_mem(self, bmidi: bytes):
         cdef const void *cmidi = <void *> bmidi
         cdef int err = fluid_player_add_mem(self.ptr, cmidi, len(bmidi))
         if err == FLUID_FAILED:
@@ -478,12 +478,12 @@ cdef class Player:
         if err == FLUID_FAILED:
             raise RuntimeError
 
-    def set_loop(self, int count):
+    def set_loop(self, count: int):
         cdef int err = fluid_player_set_loop(self.ptr, count)
         if err == FLUID_FAILED:
             raise RuntimeError
 
-    def set_tempo(self, float bpm):
+    def set_tempo(self, bpm: float):
         cdef int err = fluid_player_set_tempo(self.ptr, FLUID_PLAYER_TEMPO_EXTERNAL_BPM, bpm)
         if err == FLUID_FAILED:
             raise RuntimeError
@@ -511,7 +511,7 @@ cdef class Player:
         if err == FLUID_FAILED:
             raise RuntimeError
 
-    def seek(self, int ticks):
+    def seek(self, ticks: int):
         cdef int err = fluid_player_seek(self.ptr, ticks)
         if err == FLUID_FAILED:
             raise RuntimeError
@@ -536,7 +536,7 @@ cdef class SynthTuner:
     def __dealloc__(self):
         self.ptr = NULL
 
-    def activate_key_tuning(self, int bank, int prog, str name, list[float] pitch):
+    def activate_key_tuning(self, bank: int, prog: int, name: str, pitch: list[float]):
         assert len(pitch) == 128
         cdef double[128] cpitch
         cdef int i
@@ -547,7 +547,7 @@ cdef class SynthTuner:
         if err == FLUID_FAILED:
             raise RuntimeError
 
-    def activate_octave_tuning(self, int bank, int prog, str name, list[float] pitch):
+    def activate_octave_tuning(self, bank: int, prog: int, name: str, pitch: list[float]):
         assert len(pitch) == 12
         cdef double[12] cpitch
         cdef int i
@@ -558,17 +558,17 @@ cdef class SynthTuner:
         if err == FLUID_FAILED:
             raise RuntimeError
 
-    def activate_tuning(self, int chan, int bank, int prog):
+    def activate_tuning(self, chan: int, bank: int, prog: int):
         cdef int err = fluid_synth_activate_tuning(self.ptr, chan, bank, prog, 1)
         if err == FLUID_FAILED:
             raise RuntimeError
 
-    def deactivate_tuning(self, int chan):
+    def deactivate_tuning(self, chan: int):
         cdef int err = fluid_synth_deactivate_tuning(self.ptr, chan, 1)
         if err == FLUID_FAILED:
             raise RuntimeError
 
-    def tune_notes(self, int bank, int prog, list[int] key, list[float] pitch):
+    def tune_notes(self, bank: int, prog: int, list[int] key, pitch: list[float]):
         l = len(key)
         assert l == len(pitch)
         cdef int i
@@ -583,7 +583,7 @@ cdef class SynthTuner:
         free(cpitch)
         free(ckey)
 
-    def tuning_dump(self, int bank, int prog, str name) -> list[float]:
+    def tuning_dump(self, bank: int, prog: int, name: str) -> list[float]:
         cdef bytes bname = name.encode('utf-8')
         cdef double[128] cpitch
         cdef int err = fluid_synth_tuning_dump(self.ptr, bank, prog, bname, len(bname), cpitch)

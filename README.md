@@ -35,7 +35,9 @@ synth.sfload('path/to/sfont.sf2')
 synth.noteon(0, 60, 80)
 ```
 
-More examples can be found in the `test/` directory.
+More examples can be found in the `test/` directory for usage and applications.
+
+See `fsynth/lib.pyi` for currently implemented Python API.
 
 ## Managing fluidsynth versions
 
