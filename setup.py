@@ -47,17 +47,20 @@ req_pypi = [
 
 setup_kwargs = {
     'name': 'fsynth',
+    'version': '0.0.1',
+    'author': 'Anustuv Pal',
+    'author_email': 'anustuv@gmail.com',
     'description': 'Python adapter for fluidsynth API',
     'ext_modules': cythonize(
         binary_modules,
         compiler_directives={"language_level": "3"}),
     'install_requires': req_pypi,
     'packages': find_packages(),
-    'entry_points'    : {
-            'console_scripts': [
+    'entry_points': {
+        'console_scripts': [
             'install_fs = fsynth.install_fs:main'
-            ]
-        },
+        ]
+    },
 }
 
 setup(**setup_kwargs)
