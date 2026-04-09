@@ -268,6 +268,7 @@ cdef extern from 'fluidsynth.h':
 
 cdef extern from "cfsynth.h":
     cdef char *fs_get_sf_info(fluid_synth_t *synth, int sfid)
+    cdef int fs_send_channel_message(fluid_synth_t *synth, const unsigned char *, int length)
 
 cdef class Synthesizer:
     cdef fluid_synth_t *ptr
@@ -345,6 +346,12 @@ cdef class Synthesizer:
 
     def pitch_wheel_sens(self, int chan, int val):
         cdef int err = fluid_synth_pitch_wheel_sens(self.ptr, chan, val)
+
+    def send_message(self, data: bytes):
+        cdef const unsigned char* cmsg = data
+        cdef int err = fs_send_channel_message(self.ptr, cmsg, len(data))
+        if err == FLUID_FAILED:
+            raise RuntimeError
 
     def get_cc(self, int chan, int ctrl) -> int:
         cdef int val

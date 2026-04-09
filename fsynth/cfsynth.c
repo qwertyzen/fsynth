@@ -141,3 +141,39 @@ int fast_file_write(const char *midi_file, const char *sf_file, const char *out_
     delete_fluid_settings(settings);
     return FLUID_OK;
 }
+
+#define _NOTE_OFF             0x80
+#define _NOTE_ON              0x90
+#define _CONTROL_CHANGE       0xb0
+#define _PROGRAM_CHANGE       0xc0
+#define _PITCH_BEND           0xe0
+#define _POLY_TOUCH           0xa0
+#define _AFTER_TOUCH          0xd0
+
+int fs_send_channel_message(fluid_synth_t *synth, const unsigned char *data, int length)
+{
+    int err = FLUID_FAILED;
+    int status = data[0] & 0xF0;
+    int channel = data[0] & 0x0F;
+    switch(status) {
+        case _NOTE_OFF:
+            err = fluid_synth_noteoff(synth, channel, data[1]);
+            break;
+        case _NOTE_ON:
+            err = fluid_synth_noteon(synth, channel, data[1], data[2]);
+            break;
+        case _CONTROL_CHANGE:
+            err = fluid_synth_cc(synth, channel, data[1], data[2]);
+            break;
+        case _PROGRAM_CHANGE:
+            err = fluid_synth_program_change(synth, channel, data[1]);
+            break;
+        case _POLY_TOUCH:
+            err = fluid_synth_key_pressure(synth, channel, data[1], data[2]);
+            break;
+        case _AFTER_TOUCH:
+            err = fluid_synth_channel_pressure(synth, channel, data[1]);
+            break;
+    }
+    return err;
+}

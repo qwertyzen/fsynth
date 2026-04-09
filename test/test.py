@@ -10,3 +10,6 @@ print(sy.sf_info)
 
 sy.noteon(0, 60, 80)
 time.sleep(1)
+
+sy.send_message(bytes([0x90 | 1, 72, 120]))
+time.sleep(1)

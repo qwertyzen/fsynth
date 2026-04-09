@@ -7,5 +7,6 @@ int fs_settings_get_options(fluid_settings_t *settings, const char *cname, char 
 int fs_settings_get_names(fluid_settings_t *settings, char **pames);
 char *fs_get_sf_info(fluid_synth_t *synth, int sfid);
 int fast_file_write(const char *midi_file, const char *sf_file, const char *out_wav);
+int fs_send_channel_message(fluid_synth_t *synth, const unsigned char *data, int length);
 
 #endif  // __CFSYNTH_H__
