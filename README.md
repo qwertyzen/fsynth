@@ -13,11 +13,12 @@ This installs the install script `install_fs`.
 
 5. Run: `install_fs install`
 
-For Posix, it fetches the fluidsynth source release and builds the shared libraries. For Windows, it fetches the prebuild binary.
+- For Posix, it fetches the fluidsynth source release and builds the shared libraries.
+- For Windows, it fetches the prebuild binary.
 
 6. Run: `pip install .`
 
-This builds the `fsynth.lib` extension module and installs it.
+- This builds the `fsynth.lib` extension module and installs it.
 
 ## Usage
 
@@ -34,18 +35,20 @@ synth.sfload('path/to/sfont.sf2')
 synth.noteon(0, 60, 80)
 ```
 
-More examples can be found in the `tests/` directory.
+More examples can be found in the `test/` directory.
 
 ## Managing fluidsynth versions
 
-You can modify the `_PKG_VERSION` variable in `fsynth/install_fs.py` to a valid fluidsynth version string.
+1. Modify the `FLUIDSYNTH_VERSION` variable in `fsynth/install_fs.py` to a valid fluidsynth version string.
 
-Then, run `pip install .` from the root, and run `install_fs install`, `pip install .`
+2. Run `install_fs install` to install the fluidsynth library.
+
+3. Run `pip install .` from root of `fsynth` to build and link the Python extension.
 
 ## Build requirements
 
 For Posix:
-- cmake tools, C compiler, Python
+- cmake tools, C compiler, Python, fluidsynth dependencies.
 
 For Windows:
 - MSVC build tools, Python
@@ -65,7 +68,7 @@ makespec:
         --add-binary="$(LIB_PATH)":. \
 ```
 
-In a `.spec` file
+In a pyinstaller `.spec` file
 
 ```
 from fsynth.install_fs import get_lib_path

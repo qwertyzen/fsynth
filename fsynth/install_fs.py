@@ -13,9 +13,14 @@ WIN = 'win32'
 LINUX = 'linux'
 MACOS = 'darwin'
 
-_PKG_VERSION = '2.5.2'
+FLUIDSYNTH_VERSION         = '2.5.2'
 
-FLUIDSYNTH_GH_SOURCE_URL = f'https://github.com/FluidSynth/fluidsynth/archive/refs/tags/v{_PKG_VERSION}.zip'
+# Posix build
+FLUIDSYNTH_GH_SOURCE_URL   = f'https://github.com/FluidSynth/fluidsynth/archive/refs/tags/v{FLUIDSYNTH_VERSION}.zip'
+
+# Windows binary release
+FLUIDSYNTH_WIN_CPP11_BUILD = True  # Applies to >=v2.5.0. True for CPP11, False for glib
+FLUIDSYNTH_WIN_BIN_PATH    = 'https://github.com/FluidSynth/fluidsynth/releases/download/'
 
 def compare_versions(v1, v2):
     """
@@ -43,17 +48,15 @@ def compare_versions(v1, v2):
             return 1
     return 0
 
-if compare_versions(_PKG_VERSION, '2.5.0') >= 0:
-    FLUIDSYNTH_WIN_CPP11_BUILD = True
-    _GLIB_OR_CPP = 'cpp11' if FLUIDSYNTH_WIN_CPP11_BUILD else 'glib'
-    FLUIDSYNTH_WIN_BIN_URL = f'https://github.com/FluidSynth/fluidsynth/releases/download/v{_PKG_VERSION}/fluidsynth-v{_PKG_VERSION}-win10-x64-{_GLIB_OR_CPP}.zip'
-else:
-    FLUIDSYNTH_WIN_BIN_URL = f'https://github.com/FluidSynth/fluidsynth/releases/download/v{_PKG_VERSION}/fluidsynth-{_PKG_VERSION}-win10-x64.zip'
-
 def get_fluidsynth_install_prefix():
     if platform == MACOS or platform == LINUX:
-        return _depends_dir / f'fluidsynth-{_PKG_VERSION}' / 'install'
+        return _depends_dir / f'fluidsynth-{FLUIDSYNTH_VERSION}' / 'install'
     elif platform == WIN:
+        if compare_versions(FLUIDSYNTH_VERSION, '2.5.0') >= 0:
+            _GLIB_OR_CPP = 'cpp11' if FLUIDSYNTH_WIN_CPP11_BUILD else 'glib'
+            FLUIDSYNTH_WIN_BIN_URL = FLUIDSYNTH_WIN_BIN_PATH + f'v{FLUIDSYNTH_VERSION}/fluidsynth-v{FLUIDSYNTH_VERSION}-win10-x64-{_GLIB_OR_CPP}.zip'
+        else:
+            FLUIDSYNTH_WIN_BIN_URL = FLUIDSYNTH_WIN_BIN_PATH + f'v{FLUIDSYNTH_VERSION}/fluidsynth-{FLUIDSYNTH_VERSION}-win10-x64.zip'
         zip_name = os.path.basename(FLUIDSYNTH_WIN_BIN_URL).replace('.zip', '')
         return _depends_dir / zip_name
 
@@ -189,7 +192,7 @@ def install_fluidsynth_posix(debug=False):
     dfs = download_file_from_url(FLUIDSYNTH_GH_SOURCE_URL, _depends_dir)
     if not dfs:
         return
-    src_path = _depends_dir / f'fluidsynth-{_PKG_VERSION}'
+    src_path = _depends_dir / f'fluidsynth-{FLUIDSYNTH_VERSION}'
     unzip_file(dfs, _depends_dir)
     install_path = src_path / 'install'
     build_path = src_path / 'build'
@@ -228,7 +231,7 @@ def handle_install(args):
 
 def handle_show_info(args):
     print(f'Platform: {platform}')
-    print(f'Fluidsynth version: {_PKG_VERSION}')
+    print(f'Fluidsynth version: {FLUIDSYNTH_VERSION}')
     print(f'Install prefix: {get_fluidsynth_install_prefix()}')
     print(f'Library path: {get_fluidsynth_shared_lib_path()}')
     print(f'Installed: {os.path.exists(get_fluidsynth_shared_lib_path())}')
@@ -266,7 +269,7 @@ def main():
     parser_info.set_defaults(func=handle_show_info)
 
     parser_install = subparsers.add_parser(
-        "install", help=f"Install fluidsynth library v{_PKG_VERSION}"
+        "install", help=f"Install fluidsynth library v{FLUIDSYNTH_VERSION}"
     )
     parser_install.add_argument(
         "-d", "--debug",
