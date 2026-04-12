@@ -49,6 +49,7 @@ class Player:
     def set_loop(self, count: int): pass
     def set_tempo(self, bpm: float): pass
     def get_current_tick(self) -> int: pass
+    def is_playing(self) -> bool: pass
     def get_total_ticks(self): pass
     def get_bpm(self): pass
     def seek(self, ticks: int): pass
