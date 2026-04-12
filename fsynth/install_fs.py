@@ -229,6 +229,25 @@ def handle_install(args):
     else:
         raise OSError(f'Unsupported OS: {os.name}')
 
+def ensure_fluidsynth():
+    fs_sh_lib = get_fluidsynth_shared_lib_path()
+    if not os.path.exists(fs_sh_lib):
+        if platform == MACOS or platform == LINUX:
+            install_fluidsynth_posix()
+        # elif platform == WIN:
+        #     install_fluidsynth_windows()
+        else:
+            raise OSError(f'Unsupported OS: {os.name}')
+    install_dir = os.path.join(os.path.dirname(__file__), '_libfluidsynth')
+    lib_dir = os.path.dirname(fs_sh_lib)
+    inc_dir = os.path.join(get_fluidsynth_install_prefix(), 'include')
+    install_lib_dir = os.path.join(install_dir, 'lib')
+    install_inc_dir = os.path.join(install_dir, 'include')
+    shutil.rmtree(install_lib_dir, ignore_errors=True)
+    shutil.rmtree(install_inc_dir, ignore_errors=True)
+    shutil.copytree(lib_dir, install_lib_dir, dirs_exist_ok=True)
+    shutil.copytree(inc_dir, install_inc_dir, dirs_exist_ok=True)
+
 def handle_show_info(args):
     print(f'Platform: {platform}')
     print(f'Fluidsynth version: {FLUIDSYNTH_VERSION}')
