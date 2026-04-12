@@ -153,6 +153,8 @@ int fast_file_write(const char *midi_file, const char *sf_file, const char *out_
 int fs_send_channel_message(fluid_synth_t *synth, const unsigned char *data, int length)
 {
     int err = FLUID_FAILED;
+    if (data == NULL || length < 1)
+        return err;
     int status = data[0] & 0xF0;
     int channel = data[0] & 0x0F;
     switch(status) {
@@ -175,5 +177,5 @@ int fs_send_channel_message(fluid_synth_t *synth, const unsigned char *data, int
             err = fluid_synth_channel_pressure(synth, channel, data[1]);
             break;
     }
-    return err;
+    return FLUID_OK;
 }
