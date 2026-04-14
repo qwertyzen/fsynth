@@ -1,28 +1,6 @@
 from libc.stdlib cimport free, malloc
 from fsynth.fluidsynth cimport *
 
-cdef extern from "fluidsynth.h":
-    ctypedef void(* fluid_log_function_t) (int level, const char *message, void *data)
-    cdef fluid_log_function_t fluid_set_log_function(int level, fluid_log_function_t fun, void *data)
-    cdef int FLUID_PANIC
-    cdef int FLUID_ERR
-    cdef int FLUID_DBG
-    cdef int FLUID_INFO
-
-cdef void log_func(int level, const char *msg, void *data) noexcept:
-    cdef bytes bm = msg
-    if level == FLUID_PANIC:
-        t = 'FLUID_PANIC'
-    elif level == FLUID_ERR:
-        t = 'FLUID_ERR'
-    else:
-        t = 'OTHER'
-    print(f'Log-{t}: {bm}')
-
-fluid_set_log_function(FLUID_PANIC, &log_func, NULL)
-fluid_set_log_function(FLUID_ERR, &log_func, NULL)
-fluid_set_log_function(FLUID_INFO, &log_func, NULL)
-
 cdef extern from "cfsynth.h":
     cdef int fs_settings_get_options(fluid_settings_t *settings, const char *cname, char **poptions)
     cdef int fs_settings_get_names(fluid_settings_t *settings, char **pames)
@@ -194,7 +172,7 @@ cdef extern from "cfsynth.h":
     cdef int fs_send_channel_message(fluid_synth_t *synth, const unsigned char *, int length)
 
 cdef class Synthesizer:
-    def __cinit__(self, settings):
+    def __cinit__(self, settings: Settings):
         self.settings = settings
         self.ptr = new_fluid_synth(self.settings.ptr)
         self.sfid = FLUID_FAILED
@@ -264,7 +242,7 @@ cdef class Synthesizer:
     def pitch_wheel_sens(self, chan: int, val: int):
         cdef int err = fluid_synth_pitch_wheel_sens(self.ptr, chan, val)
 
-    def send_message(self, data: bytes):
+    def send_message(self, data: bytes | bytearray):
         cdef const unsigned char* cmsg = data
         fs_send_channel_message(self.ptr, cmsg, len(data))
 

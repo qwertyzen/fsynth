@@ -13,10 +13,10 @@ class Settings:
     def get_options(self, name: str) -> list[str]: pass
     def get_all(self) -> dict: pass
     def get_all_defaults(self) -> dict: pass
-
-def is_realtime(self, name: str) -> int: pass
+    def is_realtime(self, name: str) -> int: pass
 
 class Synthesizer:
+    def __init__(self, settings: Settings): pass
     def sfload(self, filename: str) -> None: pass
     @property
     def sf_info(self) -> list[str] | None: pass
