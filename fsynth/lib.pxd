@@ -24,3 +24,11 @@ cdef class Player:
 
 cdef class SynthTuner:
     cdef fluid_synth_t *ptr
+
+cdef class SequencerExpt:
+    cdef Settings settings
+    cdef Synthesizer synth
+    cdef AudioDriver au
+    cdef fluid_sequencer_t *ptr
+    cdef int synthSeqID, mySeqID
+    cdef unsigned int now,seqduration

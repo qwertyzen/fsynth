@@ -179,3 +179,16 @@ int fs_send_channel_message(fluid_synth_t *synth, const unsigned char *data, int
     }
     return FLUID_OK;
 }
+
+int fs_send_message_list(fluid_synth_t *synth, const unsigned char **data, int *msg_lens, int len)
+{
+    int err = FLUID_FAILED;
+    int i, msg_len;
+    const unsigned char *msg;
+    for (i=0; i<len; i++) {
+        msg = data[i];
+        msg_len = msg_lens[i];
+        err = fs_send_channel_message(synth, msg, msg_len);
+    }
+    return err;
+}

@@ -456,3 +456,68 @@ def synthesize_midifile(midi_file: str, sf_file: str, out_wav: str):
     cdef int err = fast_file_write(bmidi, bsff, bow)
     if err == FLUID_FAILED:
         raise OSError('Error in Midi or SF file')
+
+cdef void seq_callback(unsigned int time, fluid_event_t* event, fluid_sequencer_t* seq, void* data) noexcept with gil:
+    cdef SequencerExpt se = <SequencerExpt> data
+    se.schedule_next_sequence()
+
+cdef class SequencerExpt:
+    def __cinit__(self):
+        self.settings = Settings()
+        self.synth = Synthesizer(self.settings)
+        self.au = AudioDriver(self.settings, self.synth)
+        self.ptr = new_fluid_sequencer2(0)
+
+        # register synth as first destination
+        self.synthSeqID = fluid_sequencer_register_fluidsynth(self.ptr, self.synth.ptr)
+
+        # register myself as second destination
+        self.mySeqID = fluid_sequencer_register_client(self.ptr, "me", seq_callback, <void *> self)
+
+        # the sequence duration, in ms
+        self.seqduration = 1920;
+
+    def __dealloc__(self):
+        delete_fluid_sequencer(self.ptr)
+
+    def set_bpm(self, bpm: double):
+        fluid_sequencer_set_time_scale(self.ptr, bpm / 60 * 480)
+
+    def sendnoteon(self, int chan, short key, unsigned int date):
+        cdef int fluid_res
+        cdef fluid_event_t *evt = new_fluid_event()
+        fluid_event_set_source(evt, -1)
+        fluid_event_set_dest(evt, self.synthSeqID)
+        fluid_event_noteon(evt, chan, key, 100)
+        fluid_res = fluid_sequencer_send_at(self.ptr, evt, date, 1)
+        fluid_event_noteoff(evt, chan, key)
+        fluid_res = fluid_sequencer_send_at(self.ptr, evt, date + 240, 1)
+        delete_fluid_event(evt)
+
+    def schedule_next_callback(self):
+        cdef int fluid_res
+        cdef unsigned int callbackdate = self.now + self.seqduration//2
+        cdef fluid_event_t *evt = new_fluid_event()
+        fluid_event_set_source(evt, -1)
+        fluid_event_set_dest(evt, self.mySeqID)
+        fluid_event_timer(evt, NULL)
+        fluid_res = fluid_sequencer_send_at(self.ptr, evt, callbackdate, 1)
+        delete_fluid_event(evt)
+
+    def schedule_next_sequence(self):
+        self.now = self.now + self.seqduration
+        self.sendnoteon(0, 60, self.now + self.seqduration/2)
+        self.sendnoteon(0, 60, self.now + self.seqduration)
+        self.sendnoteon(1, 67, self.now + self.seqduration/10)
+        self.sendnoteon(1, 54, self.now + 4*self.seqduration/10)
+        self.sendnoteon(1, 59, self.now + 8*self.seqduration/10)
+        self.schedule_next_callback()
+
+    def main(self, sffile, bpm):
+        import time
+        self.synth.sfload(sffile)
+        self.set_bpm(bpm)
+        self.now = fluid_sequencer_get_tick(self.ptr)
+        self.schedule_next_sequence()
+        time.sleep(5)
+        return 0
