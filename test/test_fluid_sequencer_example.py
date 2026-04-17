@@ -15,7 +15,12 @@ print(f'Midi files:\n{mfs}')
 print(f'SFont files:\n{sfs}')
 
 # Init Fluidsynth and load files
-seqe = SequencerExpt()
+se = Settings()
+sy = Synthesizer(se)
+au = AudioDriver(se, sy)
 
-seqe.main(os.path.join(path, sfs[0]), 300)
+seqe = SequencerExpt(sy)
+sy.sfload(os.path.join(path, sfs[0]))
+seqe.set_bpm(300)
+seqe.start()
 input('Press Enter to end')

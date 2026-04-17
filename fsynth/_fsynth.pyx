@@ -462,10 +462,8 @@ cdef void seq_callback(unsigned int time, fluid_event_t* event, fluid_sequencer_
     se.schedule_next_sequence()
 
 cdef class SequencerExpt:
-    def __cinit__(self):
-        self.settings = Settings()
-        self.synth = Synthesizer(self.settings)
-        self.au = AudioDriver(self.settings, self.synth)
+    def __cinit__(self, synth: Synthesizer):
+        self.synth = synth
         self.ptr = new_fluid_sequencer2(0)
 
         # register synth as first destination
@@ -482,6 +480,16 @@ cdef class SequencerExpt:
 
     def set_bpm(self, bpm: double):
         fluid_sequencer_set_time_scale(self.ptr, bpm / 60 * 480)
+
+    def get_bpm(self) -> double:
+        return fluid_sequencer_get_time_scale(self.ptr) *60 / 480
+
+    def get_tick(self) -> int:
+        return fluid_sequencer_get_tick(self.ptr)
+
+    def start(self):
+        self.now = self.get_tick()
+        self.schedule_next_sequence()
 
     def sendnoteon(self, int chan, short key, unsigned int date):
         cdef int fluid_res
@@ -509,13 +517,6 @@ cdef class SequencerExpt:
         self.sendnoteon(0, 60, self.now + self.seqduration/2)
         self.sendnoteon(0, 60, self.now + self.seqduration)
         self.sendnoteon(1, 67, self.now + self.seqduration/10)
-        self.sendnoteon(1, 54, self.now + 4*self.seqduration/10)
+        # self.sendnoteon(1, 54, self.now + 4*self.seqduration/10)
         self.sendnoteon(1, 59, self.now + 8*self.seqduration/10)
         self.schedule_next_callback()
-
-    def main(self, sffile, bpm):
-        self.synth.sfload(sffile)
-        self.set_bpm(bpm)
-        self.now = fluid_sequencer_get_tick(self.ptr)
-        self.schedule_next_sequence()
-        return 0
