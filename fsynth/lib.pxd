@@ -31,4 +31,5 @@ cdef class SequencerExpt:
     cdef AudioDriver au
     cdef fluid_sequencer_t *ptr
     cdef int synthSeqID, mySeqID
-    cdef unsigned int now,seqduration
+    cdef unsigned int _now, seqduration
+    cdef object _cb

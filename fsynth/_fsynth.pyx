@@ -458,11 +458,11 @@ def synthesize_midifile(midi_file: str, sf_file: str, out_wav: str):
         raise OSError('Error in Midi or SF file')
 
 cdef void seq_callback(unsigned int time, fluid_event_t* event, fluid_sequencer_t* seq, void* data) noexcept with gil:
-    cdef SequencerExpt se = <SequencerExpt> data
+    cdef object se = <object> data
     se.schedule_next_sequence()
 
 cdef class SequencerExpt:
-    def __cinit__(self, synth: Synthesizer):
+    def __cinit__(self, synth: Synthesizer, seqduration):
         self.synth = synth
         self.ptr = new_fluid_sequencer2(0)
 
@@ -473,7 +473,8 @@ cdef class SequencerExpt:
         self.mySeqID = fluid_sequencer_register_client(self.ptr, "me", seq_callback, <void *> self)
 
         # the sequence duration, in ms
-        self.seqduration = 1920;
+        self.seqduration = seqduration
+        self._cb = lambda x: print('Default next sequence')
 
     def __dealloc__(self):
         delete_fluid_sequencer(self.ptr)
@@ -487,9 +488,14 @@ cdef class SequencerExpt:
     def get_tick(self) -> int:
         return fluid_sequencer_get_tick(self.ptr)
 
-    def start(self):
-        self.now = self.get_tick()
+    def start(self, func: callable):
+        self._now = self.get_tick()
+        self._cb = func
         self.schedule_next_sequence()
+
+    @property
+    def schedule_next_sequence(self):
+        return self._cb
 
     def sendnoteon(self, int chan, short key, unsigned int date):
         cdef int fluid_res
@@ -512,11 +518,9 @@ cdef class SequencerExpt:
         fluid_res = fluid_sequencer_send_at(self.ptr, evt, callbackdate, 1)
         delete_fluid_event(evt)
 
-    def schedule_next_sequence(self):
-        self.now = self.now + self.seqduration
-        self.sendnoteon(0, 60, self.now + self.seqduration/2)
-        self.sendnoteon(0, 60, self.now + self.seqduration)
-        self.sendnoteon(1, 67, self.now + self.seqduration/10)
-        # self.sendnoteon(1, 54, self.now + 4*self.seqduration/10)
-        self.sendnoteon(1, 59, self.now + 8*self.seqduration/10)
-        self.schedule_next_callback()
+    def advance(self, ticks: int):
+        self._now += ticks
+
+    @property
+    def now(self) -> int:
+        return self._now
