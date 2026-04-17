@@ -514,10 +514,8 @@ cdef class SequencerExpt:
         self.schedule_next_callback()
 
     def main(self, sffile, bpm):
-        import time
         self.synth.sfload(sffile)
         self.set_bpm(bpm)
         self.now = fluid_sequencer_get_tick(self.ptr)
         self.schedule_next_sequence()
-        time.sleep(5)
         return 0
