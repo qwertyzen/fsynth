@@ -1,39 +1,55 @@
+# https://www.fluidsynth.org/api/Sequencer.html
+
 from fsynth.lib import *
 import os
 import time
 
 # Find midi and soundfont files in Downloads folder
 path = os.path.join(os.path.expanduser('~'), 'Downloads')
-mfs, sfs = [], []
+sfs = []
 for item in os.listdir(path):
     if item.lower().endswith('.sf2'):
         sfs.append(item)
-    if item.lower().endswith('.mid'):
-        mfs.append(item)
 
-print(f'Midi files:\n{mfs}')
 print(f'SFont files:\n{sfs}')
 
-# Init Fluidsynth and load files
-se = Settings()
-sy = Synthesizer(se)
-au = AudioDriver(se, sy)
+# schedule_next_sequence()
+class DocSequence(SequencerClient):
+    def __init__(self, sequencer, notes):
+        super().__init__(sequencer)
+        self.now = 0
+        self.beat = 480
+        self.notes = notes
+        self.seqduration = len(notes) * self.beat
 
-seqdur = 1920
-beat = 480
-seqe = SequencerExpt(sy, seqdur)
-sy.sfload(os.path.join(path, sfs[0]))
-seqe.set_bpm(240)
+    def callback(self, time: int, sequencer):
+        for i, note in enumerate(self.notes):
+            if not self.muted:
+                sequencer.send_note(
+                    self.now + i * self.beat, 0, note, 100 if i else 120, self.beat
+                )
+        self._reschedule(self.now + self.seqduration // 2)
+        self.now += self.seqduration
 
-def schedule_next_sequence():
-    global seqe
-    seqe.advance(seqdur)
-    seqe.sendnoteon(0, 60, seqe.now )
-    seqe.sendnoteon(0, 60, seqe.now + beat)
-    seqe.sendnoteon(1, 67, seqe.now + beat * 2)
-    seqe.sendnoteon(1, 59, seqe.now + beat * 3)
-    # seqe.sendnoteon(1, 59, seqe.now + 8*seqdur/10)
-    seqe.schedule_next_callback()
+# createsynth()
+class UsingMidiSeq:
+    def __init__(self):
+        self.se = Settings()
+        self.se.set("synth.reverb.active", 0)
+        self.se.set("synth.chorus.active", 0)
+        self.sy = Synthesizer(self.se)
+        self.au = AudioDriver(self.se, self.sy)
+        self.seq = Sequencer(self.sy, time_scale=960.0)
 
-seqe.start(schedule_next_sequence)
-input('Press Enter to end')
+
+if __name__ == '__main__':
+
+    app = UsingMidiSeq()
+    sfid = app.sy.sfload(os.path.join(path, sfs[5]))
+    arp = DocSequence(app.seq, notes=[60, 60, 45, 50, 55])
+    app.sy.pc(0, 24)
+    arp.start()
+    # time.sleep(8)
+
+    input('Press Enter to end')
+    arp.stop()
