@@ -1,5 +1,6 @@
 from libc.stdlib cimport free, malloc
-from fsynth.fluidsynth cimport *
+from .fluidsynth cimport *
+from .lib cimport *
 
 cdef extern from "cfsynth.h":
     cdef int fs_settings_get_options(fluid_settings_t *settings, const char *cname, char **poptions)
@@ -495,11 +496,6 @@ cdef class Sequencer:
         Pass True to use the system clock; False (default) uses the
         internal counter advanced by fluid_sequencer_get_tick().
     """
-    cdef fluid_sequencer_t *_ptr
-    cdef fluid_seq_id_t     _synth_id   # destination id for the synth
-    cdef object             _synth_ref  # keep Synthesizer alive
-    cdef list               _clients    # SequencerClient instances
-
     def __cinit__(self, synth: Synthesizer, double time_scale=1000.0,
                   bint use_system_timer=False):
         self._ptr = new_fluid_sequencer2(1 if use_system_timer else 0)
@@ -653,6 +649,108 @@ cdef class Sequencer:
         fluid_sequencer_send_at(self._ptr, evt, at_tick, 1)
         delete_fluid_event(evt)
 
+    cpdef void send_tempo_change(self,
+                          unsigned int   at_tick,
+                          double scale,
+                          fluid_seq_id_t dest=-1):
+        """
+        Schedule a no-op timer event that fires `dest`'s callback at
+        `at_tick`.  Used by clients to reschedule themselves.
+        """
+        if dest < 0:
+            dest = self._synth_id
+        print('tempo change:', at_tick, self.tick, scale)
+        cdef fluid_event_t *evt = new_fluid_event()
+        fluid_event_set_source(evt, -1)
+        fluid_event_set_dest(evt, dest)
+        fluid_event_scale(evt, scale)
+        fluid_sequencer_send_at(self._ptr, evt, at_tick, 1)
+        delete_fluid_event(evt)
+
+    cpdef void send_pitch_bend(self,
+                                   unsigned int  at_tick,
+                                   int           channel,
+                                   int           pitch,
+                                   fluid_seq_id_t dest=-1):
+        if dest < 0:
+            dest = self._synth_id
+        cdef fluid_event_t *evt = new_fluid_event()
+        fluid_event_set_source(evt, -1)
+        fluid_event_set_dest(evt, dest)
+        fluid_event_pitch_bend(evt, channel, pitch)
+        fluid_sequencer_send_at(self._ptr, evt, at_tick, 1)
+        delete_fluid_event(evt)
+
+    cpdef void send_key_pressure(self,
+                                   unsigned int  at_tick,
+                                   int           channel,
+                                   int           key,
+                                   int           value,
+                                   fluid_seq_id_t dest=-1):
+        if dest < 0:
+            dest = self._synth_id
+        cdef fluid_event_t *evt = new_fluid_event()
+        fluid_event_set_source(evt, -1)
+        fluid_event_set_dest(evt, dest)
+        fluid_event_key_pressure(evt, channel, <short>key, value)
+        fluid_sequencer_send_at(self._ptr, evt, at_tick, 1)
+        delete_fluid_event(evt)
+
+    cpdef void send_pitch_wheelsens(self,
+                                   unsigned int  at_tick,
+                                   int           channel,
+                                   int           value,
+                                   fluid_seq_id_t dest=-1):
+        if dest < 0:
+            dest = self._synth_id
+        cdef fluid_event_t *evt = new_fluid_event()
+        fluid_event_set_source(evt, -1)
+        fluid_event_set_dest(evt, dest)
+        fluid_event_pitch_wheelsens(evt, channel, value)
+        fluid_sequencer_send_at(self._ptr, evt, at_tick, 1)
+        delete_fluid_event(evt)
+
+    cpdef void send_program_select(self,
+                                   unsigned int  at_tick,
+                                   int           channel,
+                                   unsigned int  sfont_id,
+                                   int           bank_num,
+                                   int           preset_num,
+                                   fluid_seq_id_t dest=-1):
+        if dest < 0:
+            dest = self._synth_id
+        cdef fluid_event_t *evt = new_fluid_event()
+        fluid_event_set_source(evt, -1)
+        fluid_event_set_dest(evt, dest)
+        fluid_event_program_select(evt, channel, sfont_id, <short>bank_num, <short>preset_num)
+        fluid_sequencer_send_at(self._ptr, evt, at_tick, 1)
+        delete_fluid_event(evt)
+
+    cpdef void send_system_reset(self,
+                                   unsigned int  at_tick,
+                                   fluid_seq_id_t dest=-1):
+        if dest < 0:
+            dest = self._synth_id
+        cdef fluid_event_t *evt = new_fluid_event()
+        fluid_event_set_source(evt, -1)
+        fluid_event_set_dest(evt, dest)
+        fluid_event_system_reset(evt)
+        fluid_sequencer_send_at(self._ptr, evt, at_tick, 1)
+        delete_fluid_event(evt)
+
+    cpdef void send_volume(self,
+                                   unsigned int  at_tick,
+                                   int           channel,
+                                   int           value,
+                                   fluid_seq_id_t dest=-1):
+        if dest < 0:
+            dest = self._synth_id
+        cdef fluid_event_t *evt = new_fluid_event()
+        fluid_event_set_source(evt, -1)
+        fluid_event_set_dest(evt, dest)
+        fluid_event_volume(evt, channel, value)
+        fluid_sequencer_send_at(self._ptr, evt, at_tick, 1)
+        delete_fluid_event(evt)
 
 # ---------------------------------------------------------------------------
 # SequencerClient  (base class — subclass in pure Python)
@@ -673,12 +771,6 @@ cdef class SequencerClient:
     name : str
         Human-readable name registered with FluidSynth.
     """
-    cdef public fluid_seq_id_t _seq_id
-    cdef public bint            _running
-    cdef public bint            muted
-    cdef public str             name
-    cdef public object          _sequencer   # Sequencer reference
-
     def __cinit__(self, sequencer, *args, **kw):
         self._seq_id    = -1
         self._running   = False
