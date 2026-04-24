@@ -479,6 +479,14 @@ cdef void _client_callback(
 # ---------------------------------------------------------------------------
 # Sequencer
 # ---------------------------------------------------------------------------
+def fluid_seq_ticks_per_beat(bpm: float, time_scale: float = 1000.0) -> float:
+    """
+    Convert BPM to ticks-per-beat, given the sequencer's time_scale.
+    Default time_scale=1000 means 1 tick == 1 ms.
+    """
+    return (60.0 / bpm) * time_scale
+
+
 cdef class Sequencer:
     """
     Wraps fluid_sequencer_t.
@@ -532,6 +540,9 @@ cdef class Sequencer:
     @property
     def synth_id(self):
         return self._synth_id
+
+    def get_ticks_per_beat(self, bpm: float):
+        return fluid_seq_ticks_per_beat(bpm, self.time_scale)
 
     # ------------------------------------------------------------------
     # Internal — used by SequencerClient
