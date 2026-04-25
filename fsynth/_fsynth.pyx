@@ -544,6 +544,11 @@ cdef class Sequencer:
     def get_ticks_per_beat(self, bpm: float):
         return fluid_seq_ticks_per_beat(bpm, self.time_scale)
 
+    def set_tempo(self, bpm: double, tpb: int):
+        cdef double scale = tpb * bpm / 60
+        print('set_tempo', scale)
+        fluid_sequencer_set_time_scale(self._ptr, scale)
+
     # ------------------------------------------------------------------
     # Internal — used by SequencerClient
     # ------------------------------------------------------------------
