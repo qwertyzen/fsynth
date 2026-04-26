@@ -1,5 +1,6 @@
 from libc.stdlib cimport free, malloc
-from fsynth.fluidsynth cimport *
+from .fluidsynth cimport *
+from .lib cimport *
 
 cdef extern from "cfsynth.h":
     cdef int fs_settings_get_options(fluid_settings_t *settings, const char *cname, char **poptions)
@@ -456,3 +457,422 @@ def synthesize_midifile(midi_file: str, sf_file: str, out_wav: str):
     cdef int err = fast_file_write(bmidi, bsff, bow)
     if err == FLUID_FAILED:
         raise OSError('Error in Midi or SF file')
+
+from cpython.ref cimport Py_INCREF, Py_DECREF
+
+
+# ---------------------------------------------------------------------------
+# C-level trampoline — this is the only function passed to the C library.
+# `data` holds a borrowed reference to the SequencerClient Python object.
+# ---------------------------------------------------------------------------
+cdef void _client_callback(
+    unsigned int       time,
+    fluid_event_t     *event,
+    fluid_sequencer_t *seq,
+    void              *data
+) noexcept nogil:
+    with gil:
+        client = <SequencerClient>data
+        client._dispatch(time)
+
+
+# ---------------------------------------------------------------------------
+# Sequencer
+# ---------------------------------------------------------------------------
+cdef double fluid_seq_ticks_per_beat(double bpm, double time_scale = 1000.0):
+    """
+    Convert BPM to ticks-per-beat, given the sequencer's time_scale.
+    Default time_scale=1000 means 1 tick == 1 ms.
+    """
+    return (60.0 / bpm) * time_scale
+
+
+cdef class Sequencer:
+    """
+    Wraps fluid_sequencer_t.
+
+    One sequencer is attached to one Synthesizer.  Multiple
+    SequencerClient objects register themselves against it.
+
+    Parameters
+    ----------
+    synth : Synthesizer
+        The synthesizer that will receive events.
+    time_scale : float
+        Ticks per second.  Default 1000 → 1 tick == 1 ms.
+    use_system_timer : bool
+        Pass True to use the system clock; False (default) uses the
+        internal counter advanced by fluid_sequencer_get_tick().
+    """
+    def __cinit__(self, synth: Synthesizer, double time_scale=1000.0,
+                  bint use_system_timer=False):
+        self._ptr = new_fluid_sequencer2(1 if use_system_timer else 0)
+        if self._ptr is NULL:
+            raise MemoryError("Could not create fluid_sequencer_t")
+
+        fluid_sequencer_set_time_scale(self._ptr, time_scale)
+
+        # Register the synth as a named destination
+        self._synth_id  = fluid_sequencer_register_fluidsynth(
+            self._ptr, synth.ptr   # accesses .ptr on your Synthesizer
+        )
+        self._synth_ref = synth
+        self._clients   = []
+
+    def __dealloc__(self):
+        if self._ptr is not NULL:
+            delete_fluid_sequencer(self._ptr)
+            self._ptr = NULL
+
+    # ------------------------------------------------------------------
+    # Properties
+    # ------------------------------------------------------------------
+    @property
+    def tick(self):
+        """Current sequencer tick (int)."""
+        return fluid_sequencer_get_tick(self._ptr)
+
+    @property
+    def time_scale(self):
+        """Ticks per second."""
+        return fluid_sequencer_get_time_scale(self._ptr)
+
+    @property
+    def synth_id(self):
+        return self._synth_id
+
+    def get_ticks_per_beat(self, bpm: float) -> float:
+        return fluid_seq_ticks_per_beat(bpm, self.time_scale)
+
+    def set_tempo(self, bpm: double, tpb: int):
+        cdef double scale = tpb * bpm / 60
+        print('set_tempo', scale)
+        fluid_sequencer_set_time_scale(self._ptr, scale)
+
+    # ------------------------------------------------------------------
+    # Internal — used by SequencerClient
+    # ------------------------------------------------------------------
+    cdef fluid_seq_id_t _register(self, SequencerClient client):
+        """Register a client callback; returns its seq_id."""
+        cdef bytes bname = client.name.encode("utf-8")
+        # Increment ref-count so Python doesn't GC the client while C holds it
+        Py_INCREF(client)
+        cdef fluid_seq_id_t sid = fluid_sequencer_register_client(
+            self._ptr,
+            bname,
+            _client_callback,
+            <void *>client
+        )
+        self._clients.append(client)
+        return sid
+
+    cdef void _unregister(self, SequencerClient client):
+        """Unregister a client and release its extra ref-count."""
+        fluid_sequencer_unregister_client(self._ptr, client._seq_id)
+        if client in self._clients:
+            self._clients.remove(client)
+        Py_DECREF(client)
+
+    # ------------------------------------------------------------------
+    # Scheduling helpers (called from Python-level client callbacks)
+    # ------------------------------------------------------------------
+    cpdef void send_note(self,
+                         unsigned int  at_tick,
+                         int           channel,
+                         int           key,
+                         int           velocity,
+                         unsigned int  duration,
+                         fluid_seq_id_t dest=-1):
+        """Schedule a combined note-on + note-off event."""
+        if dest < 0:
+            dest = self._synth_id
+        cdef fluid_event_t *evt = new_fluid_event()
+        fluid_event_set_source(evt, -1)
+        fluid_event_set_dest(evt, dest)
+        fluid_event_note(evt, channel, <short>key, <short>velocity, duration)
+        fluid_sequencer_send_at(self._ptr, evt, at_tick, 1)
+        delete_fluid_event(evt)
+
+    cpdef void send_noteon(self,
+                           unsigned int  at_tick,
+                           int           channel,
+                           int           key,
+                           int           velocity,
+                           fluid_seq_id_t dest=-1):
+        if dest < 0:
+            dest = self._synth_id
+        cdef fluid_event_t *evt = new_fluid_event()
+        fluid_event_set_source(evt, -1)
+        fluid_event_set_dest(evt, dest)
+        fluid_event_noteon(evt, channel, <short>key, <short>velocity)
+        fluid_sequencer_send_at(self._ptr, evt, at_tick, 1)
+        delete_fluid_event(evt)
+
+    cpdef void send_noteoff(self,
+                            unsigned int  at_tick,
+                            int           channel,
+                            int           key,
+                            fluid_seq_id_t dest=-1):
+        if dest < 0:
+            dest = self._synth_id
+        cdef fluid_event_t *evt = new_fluid_event()
+        fluid_event_set_source(evt, -1)
+        fluid_event_set_dest(evt, dest)
+        fluid_event_noteoff(evt, channel, <short>key)
+        fluid_sequencer_send_at(self._ptr, evt, at_tick, 1)
+        delete_fluid_event(evt)
+
+    cpdef void send_program_change(self,
+                                   unsigned int  at_tick,
+                                   int           channel,
+                                   int           program,
+                                   fluid_seq_id_t dest=-1):
+        if dest < 0:
+            dest = self._synth_id
+        cdef fluid_event_t *evt = new_fluid_event()
+        fluid_event_set_source(evt, -1)
+        fluid_event_set_dest(evt, dest)
+        fluid_event_program_change(evt, channel, <short>program)
+        fluid_sequencer_send_at(self._ptr, evt, at_tick, 1)
+        delete_fluid_event(evt)
+
+    cpdef void send_control_change(self,
+                                   unsigned int  at_tick,
+                                   int           channel,
+                                   int           control,
+                                   int           value,
+                                   fluid_seq_id_t dest=-1):
+        if dest < 0:
+            dest = self._synth_id
+        cdef fluid_event_t *evt = new_fluid_event()
+        fluid_event_set_source(evt, -1)
+        fluid_event_set_dest(evt, dest)
+        fluid_event_control_change(evt, channel, <short>control, <short>value)
+        fluid_sequencer_send_at(self._ptr, evt, at_tick, 1)
+        delete_fluid_event(evt)
+
+    cpdef void send_timer(self,
+                          unsigned int   at_tick,
+                          fluid_seq_id_t dest):
+        """
+        Schedule a no-op timer event that fires `dest`'s callback at
+        `at_tick`.  Used by clients to reschedule themselves.
+        """
+        cdef fluid_event_t *evt = new_fluid_event()
+        fluid_event_set_source(evt, -1)
+        fluid_event_set_dest(evt, dest)
+        fluid_event_timer(evt, NULL)
+        fluid_sequencer_send_at(self._ptr, evt, at_tick, 1)
+        delete_fluid_event(evt)
+
+    cpdef void send_tempo_change(self,
+                          unsigned int   at_tick,
+                          double scale,
+                          fluid_seq_id_t dest=-1):
+        """
+        Schedule a no-op timer event that fires `dest`'s callback at
+        `at_tick`.  Used by clients to reschedule themselves.
+        """
+        if dest < 0:
+            dest = self._synth_id
+        print('tempo change:', at_tick, self.tick, scale)
+        cdef fluid_event_t *evt = new_fluid_event()
+        fluid_event_set_source(evt, -1)
+        fluid_event_set_dest(evt, dest)
+        fluid_event_scale(evt, scale)
+        fluid_sequencer_send_at(self._ptr, evt, at_tick, 1)
+        delete_fluid_event(evt)
+
+    cpdef void send_pitch_bend(self,
+                                   unsigned int  at_tick,
+                                   int           channel,
+                                   int           pitch,
+                                   fluid_seq_id_t dest=-1):
+        if dest < 0:
+            dest = self._synth_id
+        cdef fluid_event_t *evt = new_fluid_event()
+        fluid_event_set_source(evt, -1)
+        fluid_event_set_dest(evt, dest)
+        fluid_event_pitch_bend(evt, channel, pitch)
+        fluid_sequencer_send_at(self._ptr, evt, at_tick, 1)
+        delete_fluid_event(evt)
+
+    cpdef void send_key_pressure(self,
+                                   unsigned int  at_tick,
+                                   int           channel,
+                                   int           key,
+                                   int           value,
+                                   fluid_seq_id_t dest=-1):
+        if dest < 0:
+            dest = self._synth_id
+        cdef fluid_event_t *evt = new_fluid_event()
+        fluid_event_set_source(evt, -1)
+        fluid_event_set_dest(evt, dest)
+        fluid_event_key_pressure(evt, channel, <short>key, value)
+        fluid_sequencer_send_at(self._ptr, evt, at_tick, 1)
+        delete_fluid_event(evt)
+
+    cpdef void send_pitch_wheelsens(self,
+                                   unsigned int  at_tick,
+                                   int           channel,
+                                   int           value,
+                                   fluid_seq_id_t dest=-1):
+        if dest < 0:
+            dest = self._synth_id
+        cdef fluid_event_t *evt = new_fluid_event()
+        fluid_event_set_source(evt, -1)
+        fluid_event_set_dest(evt, dest)
+        fluid_event_pitch_wheelsens(evt, channel, value)
+        fluid_sequencer_send_at(self._ptr, evt, at_tick, 1)
+        delete_fluid_event(evt)
+
+    cpdef void send_program_select(self,
+                                   unsigned int  at_tick,
+                                   int           channel,
+                                   unsigned int  sfont_id,
+                                   int           bank_num,
+                                   int           preset_num,
+                                   fluid_seq_id_t dest=-1):
+        if dest < 0:
+            dest = self._synth_id
+        cdef fluid_event_t *evt = new_fluid_event()
+        fluid_event_set_source(evt, -1)
+        fluid_event_set_dest(evt, dest)
+        fluid_event_program_select(evt, channel, sfont_id, <short>bank_num, <short>preset_num)
+        fluid_sequencer_send_at(self._ptr, evt, at_tick, 1)
+        delete_fluid_event(evt)
+
+    cpdef void send_system_reset(self,
+                                   unsigned int  at_tick,
+                                   fluid_seq_id_t dest=-1):
+        if dest < 0:
+            dest = self._synth_id
+        cdef fluid_event_t *evt = new_fluid_event()
+        fluid_event_set_source(evt, -1)
+        fluid_event_set_dest(evt, dest)
+        fluid_event_system_reset(evt)
+        fluid_sequencer_send_at(self._ptr, evt, at_tick, 1)
+        delete_fluid_event(evt)
+
+    cpdef void send_volume(self,
+                                   unsigned int  at_tick,
+                                   int           channel,
+                                   int           value,
+                                   fluid_seq_id_t dest=-1):
+        if dest < 0:
+            dest = self._synth_id
+        cdef fluid_event_t *evt = new_fluid_event()
+        fluid_event_set_source(evt, -1)
+        fluid_event_set_dest(evt, dest)
+        fluid_event_volume(evt, channel, value)
+        fluid_sequencer_send_at(self._ptr, evt, at_tick, 1)
+        delete_fluid_event(evt)
+
+# ---------------------------------------------------------------------------
+# SequencerClient  (base class — subclass in pure Python)
+# ---------------------------------------------------------------------------
+cdef class SequencerClient:
+    """
+    Base class for a sequencer client.
+
+    Subclass this in pure Python and override ``callback(time, sequencer)``.
+    The callback is responsible for:
+      1. Scheduling its own MIDI events via ``sequencer.send_note(...)`` etc.
+      2. Computing ``next_tick`` and calling ``self._reschedule(next_tick)``
+         so the loop continues.
+
+    Parameters
+    ----------
+    sequencer : Sequencer
+    name : str
+        Human-readable name registered with FluidSynth.
+    """
+    def __cinit__(self, sequencer, *args, **kw):
+        self._seq_id    = -1
+        self._running   = False
+        self.muted      = False
+        self.name       = kw.get('name', 'Client')
+        self._sequencer = sequencer
+
+    def __init__(self, sequencer, *args, **kw):
+        pass
+
+    # ------------------------------------------------------------------
+    # Public control
+    # ------------------------------------------------------------------
+    def start(self, unsigned int at_tick=0):
+        """Register with the sequencer and fire the first callback."""
+        if self._running:
+            return
+        cdef Sequencer seq = <Sequencer>self._sequencer
+        self._seq_id  = seq._register(self)
+        self._running = True
+        # Schedule the very first timer tick
+        cdef unsigned int tick = at_tick if at_tick > 0 else seq.tick
+        seq.send_timer(tick, self._seq_id)
+
+    def stop(self):
+        """Unregister from the sequencer; no more callbacks will fire."""
+        if not self._running:
+            return
+        self._running = False
+        cdef Sequencer seq = <Sequencer>self._sequencer
+        seq._unregister(self)
+        self._seq_id = -1
+
+    def mute(self):
+        """Silence this client (callback loop keeps running)."""
+        self.muted = True
+
+    def unmute(self):
+        """Resume note output."""
+        self.muted = False
+
+    def toggle_mute(self):
+        self.muted = not self.muted
+
+    # ------------------------------------------------------------------
+    # Called from the C trampoline — do not override
+    # ------------------------------------------------------------------
+    cdef void _dispatch(self, unsigned int time):
+        if not self._running:
+            return
+        try:
+            self.callback(time, self._sequencer)
+        except Exception as exc:
+            # Swallow exceptions — we are inside a C callback.
+            # Override _on_error() to handle them your way.
+            self._on_error(exc)
+
+    # ------------------------------------------------------------------
+    # Override in subclasses
+    # ------------------------------------------------------------------
+    def callback(self, unsigned int time, sequencer):
+        """
+        Override this method.
+
+        Parameters
+        ----------
+        time : int
+            The tick at which this callback was triggered.
+        sequencer : Sequencer
+            The sequencer; use its send_* helpers to schedule events.
+
+        You MUST call self._reschedule(next_tick) before returning,
+        otherwise the client goes silent.
+        """
+        raise NotImplementedError
+
+    def _on_error(self, exc):
+        """Called when callback() raises.  Override to log or re-raise."""
+        import traceback
+        traceback.print_exc()
+
+    # ------------------------------------------------------------------
+    # Helper for subclasses
+    # ------------------------------------------------------------------
+    cpdef void _reschedule(self, unsigned int next_tick):
+        """Schedule the next timer callback for this client."""
+        if not self._running:
+            return
+        (<Sequencer>self._sequencer).send_timer(next_tick, self._seq_id)

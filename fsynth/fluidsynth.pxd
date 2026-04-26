@@ -137,3 +137,101 @@ cdef extern from "fluidsynth.h":
     cdef int fluid_synth_tuning_iteration_next(fluid_synth_t *synth, int *bank, int *prog)
     cdef int fluid_synth_tuning_dump(fluid_synth_t *synth, int bank, int prog, char *name, int len, double *pitch)
 
+    ctypedef struct fluid_sequencer_t
+    ctypedef struct fluid_event_t
+    ctypedef void (*fluid_event_callback_t)(unsigned int time, fluid_event_t *event,
+                                       fluid_sequencer_t *seq, void *data);
+
+    # seq.h
+    ctypedef short fluid_seq_id_t
+    cdef fluid_sequencer_t *new_fluid_sequencer2(int use_system_timer)
+    cdef void delete_fluid_sequencer(fluid_sequencer_t *seq)
+    cdef int fluid_sequencer_get_use_system_timer(fluid_sequencer_t *seq)
+    cdef fluid_seq_id_t fluid_sequencer_register_client(fluid_sequencer_t *seq, const char *name, fluid_event_callback_t callback, void *data)
+    cdef void fluid_sequencer_unregister_client(fluid_sequencer_t *seq, fluid_seq_id_t id)
+    cdef int fluid_sequencer_count_clients(fluid_sequencer_t *seq)
+    cdef fluid_seq_id_t fluid_sequencer_get_client_id(fluid_sequencer_t *seq, int index)
+    cdef char *fluid_sequencer_get_client_name(fluid_sequencer_t *seq, fluid_seq_id_t id)
+    cdef int fluid_sequencer_client_is_dest(fluid_sequencer_t *seq, fluid_seq_id_t id)
+    cdef void fluid_sequencer_process(fluid_sequencer_t *seq, unsigned int msec)
+    cdef void fluid_sequencer_send_now(fluid_sequencer_t *seq, fluid_event_t *evt)
+    cdef int fluid_sequencer_send_at(fluid_sequencer_t *seq, fluid_event_t *evt, unsigned int time, int absolute)
+    cdef void fluid_sequencer_remove_events(fluid_sequencer_t *seq, fluid_seq_id_t source, fluid_seq_id_t dest, int type)
+    cdef unsigned int fluid_sequencer_get_tick(fluid_sequencer_t *seq)
+    cdef void fluid_sequencer_set_time_scale(fluid_sequencer_t *seq, double scale)
+    cdef double fluid_sequencer_get_time_scale(fluid_sequencer_t *seq)
+
+    # seqbind.h
+    cdef fluid_seq_id_t fluid_sequencer_register_fluidsynth(fluid_sequencer_t *seq, fluid_synth_t *synth)
+    cdef int fluid_sequencer_add_midi_event_to_buffer(void *data, fluid_midi_event_t *event)
+
+    # event.h
+    cdef enum fluid_seq_event_type:
+        FLUID_SEQ_NOTE,
+        FLUID_SEQ_NOTEON,
+        FLUID_SEQ_NOTEOFF,
+        FLUID_SEQ_ALLSOUNDSOFF,
+        FLUID_SEQ_ALLNOTESOFF,
+        FLUID_SEQ_BANKSELECT,
+        FLUID_SEQ_PROGRAMCHANGE,
+        FLUID_SEQ_PROGRAMSELECT,
+        FLUID_SEQ_PITCHBEND,
+        FLUID_SEQ_PITCHWHEELSENS,
+        FLUID_SEQ_MODULATION,
+        FLUID_SEQ_SUSTAIN,
+        FLUID_SEQ_CONTROLCHANGE,
+        FLUID_SEQ_PAN,
+        FLUID_SEQ_VOLUME,
+        FLUID_SEQ_REVERBSEND,
+        FLUID_SEQ_CHORUSSEND,
+        FLUID_SEQ_TIMER,
+        FLUID_SEQ_CHANNELPRESSURE,
+        FLUID_SEQ_KEYPRESSURE,
+        FLUID_SEQ_SYSTEMRESET,
+        FLUID_SEQ_UNREGISTERING,
+        FLUID_SEQ_SCALE,
+        FLUID_SEQ_LASTEVENT,
+
+    cdef fluid_event_t *new_fluid_event();
+    cdef void delete_fluid_event(fluid_event_t *evt);
+    cdef void fluid_event_set_source(fluid_event_t *evt, fluid_seq_id_t src);
+    cdef void fluid_event_set_dest(fluid_event_t *evt, fluid_seq_id_t dest);
+    cdef void fluid_event_timer(fluid_event_t *evt, void *data);
+    cdef void fluid_event_note(fluid_event_t *evt, int channel, short key, short vel, unsigned int duration);
+    cdef void fluid_event_noteon(fluid_event_t *evt, int channel, short key, short vel);
+    cdef void fluid_event_noteoff(fluid_event_t *evt, int channel, short key);
+    cdef void fluid_event_all_sounds_off(fluid_event_t *evt, int channel);
+    cdef void fluid_event_all_notes_off(fluid_event_t *evt, int channel);
+    cdef void fluid_event_bank_select(fluid_event_t *evt, int channel, short bank_num);
+    cdef void fluid_event_program_change(fluid_event_t *evt, int channel, int preset_num);
+    cdef void fluid_event_program_select(fluid_event_t *evt, int channel, unsigned int sfont_id, short bank_num, short preset_num);
+    cdef void fluid_event_control_change(fluid_event_t *evt, int channel, short control, int val);
+    cdef void fluid_event_pitch_bend(fluid_event_t *evt, int channel, int val);
+    cdef void fluid_event_pitch_wheelsens(fluid_event_t *evt, int channel, int val);
+    cdef void fluid_event_modulation(fluid_event_t *evt, int channel, int val);
+    cdef void fluid_event_sustain(fluid_event_t *evt, int channel, int val);
+    cdef void fluid_event_pan(fluid_event_t *evt, int channel, int val);
+    cdef void fluid_event_volume(fluid_event_t *evt, int channel, int val);
+    cdef void fluid_event_reverb_send(fluid_event_t *evt, int channel, int val);
+    cdef void fluid_event_chorus_send(fluid_event_t *evt, int channel, int val);
+    cdef void fluid_event_key_pressure(fluid_event_t *evt, int channel, short key, int val);
+    cdef void fluid_event_channel_pressure(fluid_event_t *evt, int channel, int val);
+    cdef void fluid_event_system_reset(fluid_event_t *evt);
+    cdef void fluid_event_unregistering(fluid_event_t *evt);
+    cdef void fluid_event_scale(fluid_event_t *evt, double new_scale);
+    cdef int fluid_event_from_midi_event(fluid_event_t *, const fluid_midi_event_t *);
+    cdef int fluid_event_get_type(fluid_event_t *evt);
+    cdef fluid_seq_id_t fluid_event_get_source(fluid_event_t *evt);
+    cdef fluid_seq_id_t fluid_event_get_dest(fluid_event_t *evt);
+    cdef int fluid_event_get_channel(fluid_event_t *evt);
+    cdef short fluid_event_get_key(fluid_event_t *evt);
+    cdef short fluid_event_get_velocity(fluid_event_t *evt);
+    cdef short fluid_event_get_control(fluid_event_t *evt);
+    cdef int fluid_event_get_value(fluid_event_t *evt);
+    cdef int fluid_event_get_program(fluid_event_t *evt);
+    cdef void *fluid_event_get_data(fluid_event_t *evt);
+    cdef unsigned int fluid_event_get_duration(fluid_event_t *evt);
+    cdef short fluid_event_get_bank(fluid_event_t *evt);
+    cdef int fluid_event_get_pitch(fluid_event_t *evt);
+    cdef double fluid_event_get_scale(fluid_event_t *evt);
+    cdef unsigned int fluid_event_get_sfont_id(fluid_event_t *evt);
