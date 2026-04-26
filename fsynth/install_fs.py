@@ -48,16 +48,19 @@ def compare_versions(v1, v2):
             return 1
     return 0
 
+def get_win_bin_url():
+    if compare_versions(FLUIDSYNTH_VERSION, '2.5.0') >= 0:
+        _GLIB_OR_CPP = 'cpp11' if FLUIDSYNTH_WIN_CPP11_BUILD else 'glib'
+        loc = FLUIDSYNTH_WIN_BIN_PATH + f'v{FLUIDSYNTH_VERSION}/fluidsynth-v{FLUIDSYNTH_VERSION}-win10-x64-{_GLIB_OR_CPP}.zip'
+    else:
+        loc = FLUIDSYNTH_WIN_BIN_PATH + f'v{FLUIDSYNTH_VERSION}/fluidsynth-{FLUIDSYNTH_VERSION}-win10-x64.zip'
+    return FLUIDSYNTH_WIN_BIN_PATH + loc
+
 def get_fluidsynth_install_prefix():
     if platform == MACOS or platform == LINUX:
         return _depends_dir / f'fluidsynth-{FLUIDSYNTH_VERSION}' / 'install'
     elif platform == WIN:
-        if compare_versions(FLUIDSYNTH_VERSION, '2.5.0') >= 0:
-            _GLIB_OR_CPP = 'cpp11' if FLUIDSYNTH_WIN_CPP11_BUILD else 'glib'
-            FLUIDSYNTH_WIN_BIN_URL = FLUIDSYNTH_WIN_BIN_PATH + f'v{FLUIDSYNTH_VERSION}/fluidsynth-v{FLUIDSYNTH_VERSION}-win10-x64-{_GLIB_OR_CPP}.zip'
-        else:
-            FLUIDSYNTH_WIN_BIN_URL = FLUIDSYNTH_WIN_BIN_PATH + f'v{FLUIDSYNTH_VERSION}/fluidsynth-{FLUIDSYNTH_VERSION}-win10-x64.zip'
-        zip_name = os.path.basename(FLUIDSYNTH_WIN_BIN_URL).replace('.zip', '')
+        zip_name = os.path.basename(get_win_bin_url()).replace('.zip', '')
         return _depends_dir / zip_name
 
 def get_fluidsynth_shared_lib_path():
@@ -221,11 +224,17 @@ def install_fluidsynth_posix(debug=False):
     os.chdir(install_path)
     os.chdir(curdir)
 
+def install_fluidsynth_windows():
+    dfb = download_file_from_url(get_win_bin_url(), _depends_dir)
+    if not dfb:
+        return
+    unzip_file(dfb, _depends_dir)
+
 def handle_install(args):
     if platform == MACOS or platform == LINUX:
         install_fluidsynth_posix(debug=args.debug)
-    # elif platform == WIN:
-    #     install_fluidsynth_windows()
+    elif platform == WIN:
+        install_fluidsynth_windows()
     else:
         raise OSError(f'Unsupported OS: {os.name}')
 
@@ -234,8 +243,8 @@ def ensure_fluidsynth():
     if not os.path.exists(fs_sh_lib):
         if platform == MACOS or platform == LINUX:
             install_fluidsynth_posix()
-        # elif platform == WIN:
-        #     install_fluidsynth_windows()
+        elif platform == WIN:
+            install_fluidsynth_windows()
         else:
             raise OSError(f'Unsupported OS: {os.name}')
     install_dir = os.path.join(os.path.dirname(__file__), '_libfluidsynth')
@@ -266,6 +275,9 @@ def handle_ls(args):
 
 def handle_get_lib_path(args):
     print(get_fluidsynth_shared_lib_path())
+
+def handle_clean(args):
+    shutil.rmtree(_depends_dir)
 
 def main():
     import argparse
@@ -301,6 +313,11 @@ def main():
         "get_lib_path", help="Display path to shared library"
     )
     parser_get_lib.set_defaults(func=handle_get_lib_path)
+
+    parser_clean = subparsers.add_parser(
+        "clean", help="Remove current installation and downloads."
+    )
+    parser_clean.set_defaults(func=handle_clean)
 
     args = parser.parse_args()
 
