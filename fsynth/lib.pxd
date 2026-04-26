@@ -34,6 +34,8 @@ cdef class SequencerClient:
     cdef void _dispatch(self, unsigned int time)
     cpdef void _reschedule(self, unsigned int next_tick)
 
+cdef double fluid_seq_ticks_per_beat(double bpm, double time_scale=?)
+
 cdef class Sequencer:
     cdef fluid_sequencer_t *_ptr
     cdef fluid_seq_id_t     _synth_id   # destination id for the synth

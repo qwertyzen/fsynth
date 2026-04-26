@@ -479,7 +479,7 @@ cdef void _client_callback(
 # ---------------------------------------------------------------------------
 # Sequencer
 # ---------------------------------------------------------------------------
-def fluid_seq_ticks_per_beat(bpm: float, time_scale: float = 1000.0) -> float:
+cdef double fluid_seq_ticks_per_beat(double bpm, double time_scale = 1000.0):
     """
     Convert BPM to ticks-per-beat, given the sequencer's time_scale.
     Default time_scale=1000 means 1 tick == 1 ms.
@@ -541,7 +541,7 @@ cdef class Sequencer:
     def synth_id(self):
         return self._synth_id
 
-    def get_ticks_per_beat(self, bpm: float):
+    def get_ticks_per_beat(self, bpm: float) -> float:
         return fluid_seq_ticks_per_beat(bpm, self.time_scale)
 
     def set_tempo(self, bpm: double, tpb: int):
