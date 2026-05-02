@@ -11,14 +11,11 @@ def build_fluidsynth_extn():
     cc.ensure_fluidsynth()
     extn = Extension(
         'fsynth.lib',
-        sources=[
-            'fsynth/_fsynth.pyx',
-            'fsynth/cfsynth.c',
-        ],
-        include_dirs=cc.get_compiler_fsynth_include_paths(),
-        extra_compile_args=cc.get_compiler_fsynth_extra_args(),
-        library_dirs=cc.get_linker_fsynth_lib_dirs(),
-        libraries=cc.get_linker_fsynth_libs(),
+        sources=['fsynth/_fsynth.pyx'] + cc.get_fsynth_c_sources(),
+        include_dirs=cc.get_compiler_include_paths(),
+        extra_compile_args=cc.get_compiler_extra_args(),
+        library_dirs=cc.get_linker_lib_dirs(),
+        libraries=cc.get_linker_libs(),
         extra_link_args=cc.get_linker_extra_args(),
     )
     return extn
@@ -40,9 +37,10 @@ setup_kwargs = {
         ),
     'packages': find_packages(),
     'package_data': package_data,
+    'install_requires': ['platformdirs'],
     'entry_points': {
         'console_scripts': [
-            'install_fs = fsynth.install_fs:main'
+            'install_fs = fsynth.install_fs2:main'
         ]
     },
 }

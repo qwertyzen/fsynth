@@ -351,16 +351,18 @@ class FluidsynthExtensionUtil:
     def ensure_fluidsynth(self):
         self.fsynth_manager.ensure_fluidsynth()
 
-    def get_compiler_fsynth_include_paths(self):
-        return [str(self.fsynth_manager.get_include_path())]
+    def get_compiler_include_paths(self):
+        return [
+            str(self.fsynth_manager.get_include_path()),
+            os.path.dirname(__file__)]
 
-    def get_compiler_fsynth_extra_args(self):
+    def get_compiler_extra_args(self):
         return self.fsynth_manager.get_compiler_extra_args()
 
-    def get_linker_fsynth_lib_dirs(self):
+    def get_linker_lib_dirs(self):
         return [str(self.fsynth_manager.get_shared_lib_src_path())]
 
-    def get_linker_fsynth_libs(self):
+    def get_linker_libs(self):
         return [self.fsynth_manager.get_linker_lib_name()]
 
     def get_linker_extra_args(self):
@@ -368,6 +370,11 @@ class FluidsynthExtensionUtil:
 
     def update_package_data(self, package_data: dict):
         return self.fsynth_manager.update_package_data_arg(package_data)
+
+    def get_fsynth_c_sources(self):
+        this_path = Path(os.path.dirname(__file__))
+        srcs = list(map(str, this_path.glob('c*.c')))
+        return srcs
 
 def _handle_uninst(args):
     shutil.rmtree(dirs.user_state_path, ignore_errors=True)
