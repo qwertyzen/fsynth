@@ -45,7 +45,7 @@ class UsingMidiSeq:
 if __name__ == '__main__':
 
     app = UsingMidiSeq()
-    sfid = app.sy.sfload(os.path.join(path, sfs[5]))
+    sfid = app.sy.sfload(os.path.join(path, sfs[0]))
     arp = DocSequence(app.seq, notes=[60, 60, 45, 50, 55])
     app.sy.pc(0, 24)
     arp.start()
