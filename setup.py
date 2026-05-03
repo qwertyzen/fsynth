@@ -3,7 +3,7 @@ from setuptools import Extension, find_packages
 from Cython.Build import cythonize
 from setuptools import setup
 sys.path.insert(0, os.path.dirname(__file__))
-from fsynth.install_fs2 import FluidsynthExtensionUtil
+from fsynth.install_fs import FluidsynthExtensionUtil
 
 cc = FluidsynthExtensionUtil()
 
@@ -40,7 +40,7 @@ setup_kwargs = {
     'install_requires': ['platformdirs'],
     'entry_points': {
         'console_scripts': [
-            'install_fs = fsynth.install_fs2:main'
+            'install_fs = fsynth.install_fs:main'
         ]
     },
 }
