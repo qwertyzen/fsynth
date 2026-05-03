@@ -6,3 +6,7 @@ build/
 *.so
 *.dylib
 *.dll
+fsynth/_fsynth.c
+fsynth/_libfluidsynth/**/
+
+.DS_Store
