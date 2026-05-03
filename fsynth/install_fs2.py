@@ -62,15 +62,15 @@ def download_file_from_url(url: str, dir_path: str, overwrite=False) -> str | No
     import requests
 
     if not url or not url.strip():
-        print("✗ Error: URL cannot be empty.")
+        print("! Error: URL cannot be empty.")
         return None
 
     if dir_path and not dir_path.exists():
         try:
             os.makedirs(dir_path, exist_ok=True)
-            print(f"✓ Created directory: {dir_path}")
+            print(f"- Created directory: {dir_path}")
         except OSError as e:
-            print(f"✗ Error: Could not create directory '{dir_path}': {e}")
+            print(f"! Error: Could not create directory '{dir_path}': {e}")
             return None
 
     path = dir_path / os.path.basename(url)
@@ -78,8 +78,8 @@ def download_file_from_url(url: str, dir_path: str, overwrite=False) -> str | No
         print('File already exists. Not downloading.')
         return path
 
-    print(f"↓ Downloading from:\n  {url}")
-    print(f"→ Saving to: {path}")
+    print(f"- Downloading from:\n  {url}")
+    print(f"- Saving to: {path}")
 
     try:
         with requests.get(url, stream=True, timeout=30) as response:
@@ -102,7 +102,7 @@ def download_file_from_url(url: str, dir_path: str, overwrite=False) -> str | No
                         percent = downloaded_bytes / total_size * 100
                         total_mb = total_size / (1024 * 1024)
                         filled = int(bar_width * downloaded_bytes / total_size)
-                        bar = "█" * filled + "░" * (bar_width - filled)
+                        bar = "X" * filled + "x" * (bar_width - filled)
                         sys.stdout.write(f"\r  [{bar}] {percent:5.1f}%  {done_mb:.2f} / {total_mb:.2f} MB")
                     else:
                         # Unknown content length — show spinner with bytes so far
@@ -112,21 +112,21 @@ def download_file_from_url(url: str, dir_path: str, overwrite=False) -> str | No
 
         print()  # newline after progress bar
         file_size_mb = os.path.getsize(path) / (1024 * 1024)
-        print(f"✓ Download complete! ({file_size_mb:.2f} MB saved)\n")
+        print(f"- Download complete! ({file_size_mb:.2f} MB saved)\n")
         return path
 
     except requests.exceptions.HTTPError as e:
-        print(f"\n✗ HTTP Error {e.response.status_code}: {e.response.reason} — check the URL and try again.")
+        print(f"\n! HTTP Error {e.response.status_code}: {e.response.reason} — check the URL and try again.")
     except requests.exceptions.ConnectionError:
-        print("\n✗ Connection error — check your internet connection or URL.")
+        print("\n! Connection error — check your internet connection or URL.")
     except requests.exceptions.Timeout:
-        print("\n✗ Request timed out — the server took too long to respond.")
+        print("\n! Request timed out — the server took too long to respond.")
     except requests.exceptions.RequestException as e:
-        print(f"\n✗ Request failed: {e}")
+        print(f"\n! Request failed: {e}")
     except PermissionError:
-        print(f"\n✗ Permission denied: cannot write to '{path}'.")
+        print(f"\n! Permission denied: cannot write to '{path}'.")
     except OSError as e:
-        print(f"\n✗ File system error: {e}")
+        print(f"\n! File system error: {e}")
 
     return None
 
@@ -134,21 +134,21 @@ def unzip_file(zip_file: str, path: str, dirname: str = None) -> str | None:
     """Unzips a zip archive into the given directory path."""
 
     if not os.path.exists(zip_file):
-        print(f"✗ Error: Zip file not found: '{zip_file}'")
+        print(f"! Error: Zip file not found: '{zip_file}'")
         return
 
     if not zipfile.is_zipfile(zip_file):
-        print(f"✗ Error: '{zip_file}' is not a valid zip file.")
+        print(f"! Error: '{zip_file}' is not a valid zip file.")
         return
 
     try:
         os.makedirs(path, exist_ok=True)
     except OSError as e:
-        print(f"✗ Error: Could not create output directory '{path}': {e}")
+        print(f"! Error: Could not create output directory '{path}': {e}")
         return
 
-    print(f"📦 Extracting: {zip_file}")
-    print(f"→ Destination: {path}")
+    print(f"- Extracting: {zip_file}")
+    print(f"- Destination: {path}")
 
     try:
         with zipfile.ZipFile(zip_file, "r") as zf:
@@ -162,15 +162,15 @@ def unzip_file(zip_file: str, path: str, dirname: str = None) -> str | None:
             zf.extractall(path)
 
         print()
-        print(f"✓ Extraction complete! Extracted to '{path}'\n")
+        print(f"Extraction complete! Extracted to '{path}'\n")
         return path
 
     except zipfile.BadZipFile:
-        print("\n✗ Error: The zip file is corrupted or invalid.")
+        print("\nError: The zip file is corrupted or invalid.")
     except PermissionError as e:
-        print(f"\n✗ Permission denied: {e}")
+        print(f"\nPermission denied: {e}")
     except OSError as e:
-        print(f"\n✗ File system error during extraction: {e}")
+        print(f"\nFile system error during extraction: {e}")
 
 class AnyOS:
     def __init__(self):
@@ -196,7 +196,7 @@ class AnyOS:
         self.prepare_package_data()
 
     def get_linker_extra_args(self):
-        return []
+        return None
 
     def update_package_data_arg(self, package_data: dict):
         data = package_data.copy()
@@ -213,9 +213,6 @@ class AnyOS:
         raise NotImplementedError('Do not directly instantiate baseclass.')
 
     def get_compiler_extra_args(self):
-        return ['']
-
-    def get_linker_extra_args(self):
         return ['']
 
 class Posix(AnyOS):
@@ -295,6 +292,10 @@ class Windows(AnyOS):
         super().__init__()
         self._install_path = self.get_fluidsynth_root_path()
 
+    def get_fluidsynth_root_path(self):
+        dirname = os.path.basename(self._get_win_bin_url()).replace('.zip', '')
+        return _depends_dir / dirname
+
     def _get_win_bin_url(self):
         if compare_versions(FLUIDSYNTH_VERSION, '2.5.0') >= 0:
             _GLIB_OR_CPP = 'cpp11' if FLUIDSYNTH_WIN_CPP11_BUILD else 'glib'
@@ -319,7 +320,6 @@ class Windows(AnyOS):
         libdir = self._install_path / 'lib'
         incdir = self._install_path / 'include'
         dlldir = self._install_path / 'bin'
-        dllfile = dlldir / self.get_shared_lib_name().replace('.lib', '.dll')
         install_lib_dir = self._package_dir / 'lib'
         install_inc_dir = self._package_dir / 'include'
         install_dll_dir = self._package_dir / '..'
@@ -327,10 +327,11 @@ class Windows(AnyOS):
         shutil.rmtree(install_inc_dir, ignore_errors=True)
         shutil.copytree(libdir, install_lib_dir, dirs_exist_ok=True)
         shutil.copytree(incdir, install_inc_dir, dirs_exist_ok=True)
-        shutil.copy(dllfile, install_dll_dir)
+        for dllfile in dlldir.glob('*.dll'):
+            shutil.copy(dllfile, install_dll_dir)
 
     def update_package_data_arg(self, package_data: dict):
-        data = super().updata_package_data_arg(package_data)
+        data = super().update_package_data_arg(package_data)
         data['fsynth'].append('*.dll')
         return data
 
