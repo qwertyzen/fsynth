@@ -27,7 +27,7 @@ package_data = cc.update_package_data(package_data)
 
 setup_kwargs = {
     'name': 'fsynth',
-    'version': '0.0.1',
+    'version': '0.1.0',
     'author': 'Anustuv Pal',
     'author_email': 'anustuv@gmail.com',
     'description': 'Python enhanced fluidsynth API',

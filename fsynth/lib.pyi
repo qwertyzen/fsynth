@@ -65,3 +65,84 @@ class SynthTuner:
     def tuning_dump(self, bank: int, prog: int, name: str) -> list[float]: pass
     def get_tuning_banks(self) -> list[tuple[int, int]]: pass
 
+class SequencerClient:
+    def __init__(self, sequencer, *args, **kw): ...
+    def _reschedule(self, next_tick: int): ...
+    def start(self, at_tick: int = 0): ...
+    def stop(self): ...
+    def mute(self): ...
+    def unmute(self): ...
+    def toggle_mute(self): ...
+    def callback(self, time: int, sequencer): ...
+    def _on_error(self, exc): ...
+
+class Sequencer:
+    def send_note(self,
+                         at_tick: int,
+                         channel: int,
+                         key: int,
+                         velocity: int,
+                         duration: int,
+                         dest: int): ...
+    def send_noteon(self,
+                           at_tick: int,
+                           channel: int,
+                           key: int,
+                           velocity: int,
+                           dest: int): ...
+    def send_noteoff(self,
+                            at_tick: int,
+                            channel: int,
+                            key: int,
+                            dest: int): ...
+    def send_program_change(self,
+                                   at_tick: int,
+                                   channel: int,
+                                   program: int,
+                                   dest: int): ...
+    def send_control_change(self,
+                                   at_tick: int,
+                                   channel: int,
+                                   control: int,
+                                   value: int,
+                                   dest: int): ...
+    def send_timer(self,
+                          at_tick: int,
+                          dest: int): ...
+
+    def send_tempo_change(self,
+                          at_tick: int,
+                          tempo: int,
+                          dest: int): ...
+
+    def send_key_pressure(self,
+                                   at_tick: int,
+                                   channel: int,
+                                   key: int,
+                                   value: int,
+                                   dest: int): ...
+    def send_pitch_bend(self,
+                                   at_tick: int,
+                                   channel: int,
+                                   pitch: int,
+                                   dest: int): ...
+    def send_pitch_wheelsens(self,
+                                   at_tick: int,
+                                   channel: int,
+                                   value: int,
+                                   dest: int): ...
+    def send_program_select(self,
+                                   at_tick: int,
+                                   channel: int,
+                                   sfont_id: int,
+                                   bank_num: int,
+                                   preset_num: int,
+                                   dest: int): ...
+    def send_system_reset(self,
+                                   at_tick: int,
+                                   dest: int): ...
+    def send_volume(self,
+                                   at_tick: int,
+                                   channel: int,
+                                   value: int,
+                                   dest: int): ...
