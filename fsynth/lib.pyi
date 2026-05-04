@@ -77,6 +77,8 @@ class SequencerClient:
     def _on_error(self, exc): ...
 
 class Sequencer:
+    def __init__(self, synth: Synthesizer, time_scale: float = 1000.0,
+                  use_system_timer: bool = False): ...
     def send_note(self,
                          at_tick: int,
                          channel: int,

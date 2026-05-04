@@ -30,9 +30,11 @@ cdef class SequencerClient:
     cdef public bint            _running
     cdef public bint            muted
     cdef public str             name
-    cdef public object          _sequencer   # Sequencer reference
+    cdef public Sequencer       _sequencer   # Sequencer reference
     cdef void _dispatch(self, unsigned int time)
     cpdef void _reschedule(self, unsigned int next_tick)
+    cdef void _register(self)
+    cdef void _unregister(self)
 
 cdef double fluid_seq_ticks_per_beat(double bpm, double time_scale=?)
 
@@ -41,7 +43,7 @@ cdef class Sequencer:
     cdef fluid_seq_id_t     _synth_id   # destination id for the synth
     cdef object             _synth_ref  # keep Synthesizer alive
     cdef list               _clients    # SequencerClient instances
-    cdef fluid_seq_id_t _register(self, SequencerClient client)
+    cdef void _register(self, SequencerClient client)
     cdef void _unregister(self, SequencerClient client)
     cpdef void send_note(self,
                          unsigned int  at_tick,

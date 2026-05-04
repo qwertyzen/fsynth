@@ -458,23 +458,6 @@ def synthesize_midifile(midi_file: str, sf_file: str, out_wav: str):
     if err == FLUID_FAILED:
         raise OSError('Error in Midi or SF file')
 
-from cpython.ref cimport Py_INCREF, Py_DECREF
-
-
-# ---------------------------------------------------------------------------
-# C-level trampoline — this is the only function passed to the C library.
-# `data` holds a borrowed reference to the SequencerClient Python object.
-# ---------------------------------------------------------------------------
-cdef void _client_callback(
-    unsigned int       time,
-    fluid_event_t     *event,
-    fluid_sequencer_t *seq,
-    void              *data
-) noexcept nogil:
-    with gil:
-        client = <SequencerClient>data
-        client._dispatch(time)
-
 
 # ---------------------------------------------------------------------------
 # Sequencer
@@ -552,19 +535,11 @@ cdef class Sequencer:
     # ------------------------------------------------------------------
     # Internal — used by SequencerClient
     # ------------------------------------------------------------------
-    cdef fluid_seq_id_t _register(self, SequencerClient client):
+    cdef void _register(self, SequencerClient client):
         """Register a client callback; returns its seq_id."""
-        cdef bytes bname = client.name.encode("utf-8")
         # Increment ref-count so Python doesn't GC the client while C holds it
         Py_INCREF(client)
-        cdef fluid_seq_id_t sid = fluid_sequencer_register_client(
-            self._ptr,
-            bname,
-            _client_callback,
-            <void *>client
-        )
         self._clients.append(client)
-        return sid
 
     cdef void _unregister(self, SequencerClient client):
         """Unregister a client and release its extra ref-count."""
@@ -768,6 +743,24 @@ cdef class Sequencer:
         fluid_sequencer_send_at(self._ptr, evt, at_tick, 1)
         delete_fluid_event(evt)
 
+from cpython.ref cimport Py_INCREF, Py_DECREF
+
+
+# ---------------------------------------------------------------------------
+# C-level trampoline — this is the only function passed to the C library.
+# `data` holds a borrowed reference to the SequencerClient Python object.
+# ---------------------------------------------------------------------------
+cdef void _client_callback(
+    unsigned int       time,
+    fluid_event_t     *event,
+    fluid_sequencer_t *seq,
+    void              *data
+) noexcept nogil:
+    with gil:
+        client = <SequencerClient>data
+        client._dispatch(time)
+
+
 # ---------------------------------------------------------------------------
 # SequencerClient  (base class — subclass in pure Python)
 # ---------------------------------------------------------------------------
@@ -797,6 +790,22 @@ cdef class SequencerClient:
     def __init__(self, sequencer, *args, **kw):
         pass
 
+    cdef void _register(self):
+        """Register a client callback; returns its seq_id."""
+        cdef bytes bname = self.name.encode("utf-8")
+        self._seq_id = fluid_sequencer_register_client(
+            self._sequencer._ptr,
+            bname,
+            _client_callback,
+            <void *>self
+        )
+        self._sequencer._register(self)
+
+    cdef void _unregister(self):
+        """Unregister a client and release its extra ref-count."""
+        self._sequencer._unregister(self)
+        self._seq_id = -1
+
     # ------------------------------------------------------------------
     # Public control
     # ------------------------------------------------------------------
@@ -805,7 +814,7 @@ cdef class SequencerClient:
         if self._running:
             return
         cdef Sequencer seq = <Sequencer>self._sequencer
-        self._seq_id  = seq._register(self)
+        self._register()
         self._running = True
         # Schedule the very first timer tick
         cdef unsigned int tick = at_tick if at_tick > 0 else seq.tick
@@ -816,9 +825,7 @@ cdef class SequencerClient:
         if not self._running:
             return
         self._running = False
-        cdef Sequencer seq = <Sequencer>self._sequencer
-        seq._unregister(self)
-        self._seq_id = -1
+        self._unregister()
 
     def mute(self):
         """Silence this client (callback loop keeps running)."""
