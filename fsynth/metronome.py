@@ -52,10 +52,14 @@ class Metronome(SequencerClient):
         self.residue: float   = 0.0
 
     def start(self):
-        super().start()
         self.tick = self._sequencer.tick + 20
+        self._beat_index = 0
+        self.residue = 0.0
+        super().start(self.tick)
 
     def callback(self, time: int, sequencer) -> None:
+        if not self._running:
+            return
         # time calculation
         tpb = sequencer.get_ticks_per_beat(self.bpm)
         self.residue += tpb % 1
