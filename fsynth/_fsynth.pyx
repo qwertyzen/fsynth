@@ -756,6 +756,9 @@ cdef void _client_callback(
     fluid_sequencer_t *seq,
     void              *data
 ) noexcept nogil:
+    if data is NULL:
+        return
+
     with gil:
         client = <SequencerClient>data
         client._dispatch(time)
@@ -786,6 +789,10 @@ cdef class SequencerClient:
         self.muted      = False
         self.name       = kw.get('name', 'Client')
         self._sequencer = sequencer
+        self._register()
+
+    def __dealloc__(self):
+        self._unregister()
 
     def __init__(self, sequencer, *args, **kw):
         pass
@@ -814,7 +821,6 @@ cdef class SequencerClient:
         if self._running:
             return
         cdef Sequencer seq = <Sequencer>self._sequencer
-        self._register()
         self._running = True
         # Schedule the very first timer tick
         cdef unsigned int tick = at_tick if at_tick > 0 else seq.tick
@@ -822,10 +828,7 @@ cdef class SequencerClient:
 
     def stop(self):
         """Unregister from the sequencer; no more callbacks will fire."""
-        if not self._running:
-            return
         self._running = False
-        self._unregister()
 
     def mute(self):
         """Silence this client (callback loop keeps running)."""
