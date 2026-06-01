@@ -49,10 +49,16 @@ class Player:
     def set_loop(self, count: int): pass
     def set_tempo(self, bpm: float): pass
     def get_current_tick(self) -> int: pass
+    def get_status(self) -> int: pass
     def is_playing(self) -> bool: pass
     def get_total_ticks(self): pass
     def get_bpm(self): pass
     def seek(self, ticks: int): pass
+
+class FileWriter:
+    def __init__(self, soundfont: str) -> None: ...
+    def render_midi_file(self, midi_file: str, audio_file: str, extra_time: float=0): ...
+    def render_midi_mem(self, bmidi: bytes, audio_file: str, extra_time: float=0.0): ...
 
 class SynthTuner:
     def __init__(self, synth: Synthesizer): pass
@@ -79,6 +85,19 @@ class SequencerClient:
 class Sequencer:
     def __init__(self, synth: Synthesizer, time_scale: float = 1000.0,
                   use_system_timer: bool = False): ...
+    @property
+    def tick(self): ...
+
+    @property
+    def time_scale(self): ...
+
+    @property
+    def synth_id(self): ...
+
+    def get_ticks_per_beat(self, bpm: float) -> float: ...
+
+    def set_tempo(self, bpm: float, tpb: int): ...
+
     def send_note(self,
                          at_tick: int,
                          channel: int,

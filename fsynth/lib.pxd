@@ -22,6 +22,14 @@ cdef class Player:
     cdef fluid_player_t *ptr
     cdef Synthesizer synth
 
+cdef class FileWriter:
+    cdef Settings settings
+    cdef Synthesizer synth
+    cdef str soundfont
+
+    cdef void _process(self, player, extra_time)
+    cdef void _check_sfid(self)
+
 cdef class SynthTuner:
     cdef fluid_synth_t *ptr
 

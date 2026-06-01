@@ -312,9 +312,10 @@ cdef class Player:
         if err == FLUID_FAILED:
             raise RuntimeError
 
-    def add_mem(self, bmidi: bytes):
-        cdef const void *cmidi = <void *> bmidi
-        cdef int err = fluid_player_add_mem(self.ptr, cmidi, len(bmidi))
+    def add_mem(self, bytes bmidi):
+        cdef const char *cmidi = bmidi
+        cdef const void *vmidi = <void *> cmidi
+        cdef int err = fluid_player_add_mem(self.ptr, vmidi, len(bmidi))
         if err == FLUID_FAILED:
             raise RuntimeError
 
@@ -355,6 +356,12 @@ cdef class Player:
             raise RuntimeError
         return err
 
+    def get_status(self) -> int:
+        cdef int err = fluid_player_get_status(self.ptr)
+        if err == FLUID_FAILED:
+            raise RuntimeError
+        return err
+
     def is_playing(self) -> bool:
         cdef int sta = fluid_player_get_status(self.ptr)
         if sta == FLUID_PLAYER_PLAYING:
@@ -370,6 +377,65 @@ cdef class Player:
         cdef int err = fluid_player_seek(self.ptr, ticks)
         if err == FLUID_FAILED:
             raise RuntimeError
+
+cdef class FileWriter:
+    def __init__(self, soundfont: str) -> None:
+        self.soundfont = soundfont
+
+    def _init(self):
+        if not self.settings:
+            self.settings = Settings()
+            self.synth = Synthesizer(self.settings)
+            self.synth.sfload(self.soundfont)
+
+    cdef void _process(self, player, extra_time):
+        cdef fluid_file_renderer_t *renderer
+        renderer = new_fluid_file_renderer(self.synth.ptr)
+        while player.get_status() == FLUID_PLAYER_PLAYING:
+            if fluid_file_renderer_process_block(renderer) != FLUID_OK:
+                break
+
+        cdef double sample_rate = self.settings.get('synth.sample-rate')
+        cdef int period_size = self.settings.get('audio.period-size')
+        cdef int extra_blocks = int(sample_rate * extra_time // period_size)
+        for _ in range(extra_blocks):
+            if fluid_file_renderer_process_block(renderer) != FLUID_OK:
+                break
+        delete_fluid_file_renderer(renderer)
+
+    cdef void _check_sfid(self):
+        if self.synth.sfid == FLUID_FAILED:
+            raise RuntimeError('No soundfont loaded in synth.')
+
+    def _set_render_params(self, audio_file: str):
+        self.settings.set('audio.file.name', audio_file)
+        self.settings.set('player.timing-source', 'sample')
+        self.settings.set('synth.lock-memory', 0)
+
+    def render_midi_file(self, midi_file: str, audio_file: str, extra_time: float=0.0):
+        self._init()
+        cdef bytes cmifile = midi_file.encode('utf-8')
+        if not fluid_is_midifile(cmifile):
+            raise OSError('Bad midi file.')
+        self._check_sfid()
+        self._set_render_params(audio_file)
+        player = Player(self.synth)
+        player.add(midi_file)
+        player.play()
+        self._process(player, extra_time)
+        player.stop()
+        player.join()
+
+    def render_midi_mem(self, bmidi: bytes, audio_file: str, extra_time: float=0.0):
+        self._init()
+        self._check_sfid()
+        self._set_render_params(audio_file)
+        player = Player(self.synth)
+        player.add_mem(bmidi)
+        player.play()
+        self._process(player, extra_time)
+        player.stop()
+        player.join()
 
 cdef class SynthTuner:
 

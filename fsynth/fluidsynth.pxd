@@ -100,6 +100,12 @@ cdef extern from "fluidsynth.h":
         fluid_synth_t *synth)
     cdef void delete_fluid_audio_driver	(	fluid_audio_driver_t * 	driver	)
 
+    ctypedef struct fluid_file_renderer_t
+    cdef fluid_file_renderer_t *new_fluid_file_renderer(fluid_synth_t *synth)
+    cdef void delete_fluid_file_renderer(fluid_file_renderer_t *dev)
+    cdef int fluid_file_renderer_process_block(fluid_file_renderer_t *dev)
+    cdef int fluid_file_set_encoding_quality(fluid_file_renderer_t *dev, double q)
+
 cdef extern from "fluidsynth.h":
     ctypedef struct fluid_player_t
     cdef fluid_player_t *new_fluid_player(fluid_synth_t *synth)
@@ -125,6 +131,11 @@ cdef extern from "fluidsynth.h":
     cdef int fluid_player_seek(fluid_player_t *player, int ticks)
     cdef int FLUID_PLAYER_TEMPO_EXTERNAL_BPM
     cdef int FLUID_PLAYER_PLAYING
+
+    # misc.h
+    cdef int fluid_is_soundfont(const char *filename)
+    cdef int fluid_is_midifile(const char *filename)
+    cdef void fluid_free(void* ptr)
 
 cdef extern from "fluidsynth.h":
 
