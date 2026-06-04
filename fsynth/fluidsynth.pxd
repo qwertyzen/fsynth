@@ -1,7 +1,8 @@
 cdef extern from "fluidsynth.h":
     cdef void fluid_version(int *major, int *minor, int *micro)
-    cdef int FLUID_OK
-    cdef int FLUID_FAILED
+    enum:
+        FLUID_OK
+        FLUID_FAILED
     cdef int FLUID_NO_TYPE
     cdef int FLUID_NUM_TYPE
     cdef int FLUID_INT_TYPE
