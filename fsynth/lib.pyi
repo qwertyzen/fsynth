@@ -1,3 +1,4 @@
+def fluidsynth_version() -> str: pass
 def enumerate_audio_devices(audio_driver: str = None) -> list[str]: pass
 def synthesize_midifile(midi_file: str, sf_file: str, out_wav: str): pass
 

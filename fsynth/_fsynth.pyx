@@ -6,6 +6,11 @@ cdef extern from "cfsynth.h":
     cdef int fs_settings_get_options(fluid_settings_t *settings, const char *cname, char **poptions)
     cdef int fs_settings_get_names(fluid_settings_t *settings, char **pames)
 
+def fluidsynth_version() -> str:
+    cdef int maj, min, sub
+    fluid_version(&maj, &min, &sub)
+    return f'{maj}.{min}.{sub}'
+
 cdef class Settings:
 
     def __cinit__(self):
